@@ -4,7 +4,8 @@
 /node_modules
 /.pnp
 .pnp.js
-
+# Ignore service account credentials
+backend/service_account.json
 # testing
 /coverage
 
