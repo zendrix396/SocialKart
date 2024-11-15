@@ -1,6 +1,5 @@
 import os
 import shutil
-import uuid
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import base64
@@ -8,6 +7,7 @@ from video_caption_grabber import grab_post
 from separate_frames import video_to_frames
 from classify_frames import classify_and_move_images
 from transcribe_video import transcribe_video
+import time
 from parse_gemini import parse_content
 app = Flask(__name__)
 CORS(app)
@@ -30,15 +30,17 @@ def process_instagram_post():
         classify_and_move_images(shortcode, "posts")
         transcribe_video(video_path, "posts", shortcode)
         parsed_content = parse_content(shortcode, "posts")
+        time.sleep(3)
         relevant_dir = f"posts/output_frames_{shortcode}/relevant"
         images = [img for img in os.listdir(relevant_dir) if img.lower().endswith(('.png', '.jpg', '.jpeg'))]
-        selected_images = images[:10] if len(images) >= 10 else images # TODO: IMPLEMENT RANDOM
+        selected_images = images # TODO: IMPLEMENT RANDOM
         image_urls = []
         for img in selected_images:
             image_path = f"{relevant_dir}/{img}"
             with open(image_path, "rb") as image_file:
                 encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
                 image_urls.append(encoded_string)
+        print(f"Number of images being sent: {len(image_urls)}")
         return jsonify({
             'parsed_content': parsed_content,
             'images': image_urls

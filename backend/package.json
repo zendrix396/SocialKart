@@ -1,0 +1,39 @@
+{
+  "name": "clewd",
+  "version": "4.9.5",
+  "description": ":^)",
+  "main": "clewd.js",
+  "engines": {
+    "node": ">=20.4.0"
+  },
+  "scripts": {
+    "run": "node clewd.js"
+  },
+  "keywords": [
+    "doom",
+    "coom"
+  ],
+  "author": {
+    "name": "ahsk",
+    "url": "https://gitgud.io/ahsk"
+  },
+  "contributors": [
+    {
+      "name": "ahsk",
+      "url": "https://gitgud.io/ahsk"
+    },
+    {
+      "name": "h-a-s-k",
+      "url": "https://github.com/h-a-s-k"
+    }
+  ],
+  "homepage": "https://gitgud.io/ahsk/clewd",
+  "repository": {
+    "type": "git",
+    "url": "git+https://gitgud.io/ahsk/clewd.git"
+  },
+  "bugs": {
+    "url": "https://gitgud.io/ahsk/clewd/-/issues"
+  },
+  "dependencies": {}
+}

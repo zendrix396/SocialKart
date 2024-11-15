@@ -15,7 +15,6 @@ def grab_post(shortcode, posts_dir):
         post = instaloader.Post.from_shortcode(L.context, shortcode)
         target_dir = f"posts/post_{shortcode}"
         L.dirname_pattern = f"posts/post_{shortcode}"
-        os.mkdir(f"posts/post{shortcode}")
         L.download_post(post, target=shortcode)
         print(f"Post downloaded successfully: {target_dir}")
 
