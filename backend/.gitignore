@@ -54,7 +54,8 @@ build/Release
 # Dependency directories
 node_modules/
 jspm_packages/
-
+posts/
+pretrained_models/
 # TypeScript v1 declaration files
 typings/
 

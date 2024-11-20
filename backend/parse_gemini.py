@@ -25,7 +25,7 @@ def parse_content(shortcode, posts_dir):
     transcription = read_file_safe(post_dir / 'captions.txt') or 'No transcribed text found.'
 
     # Prepare prompt for Claude
-    prompt = f"""Generate a comprehensive Amazon product listing based on the following content:
+    prompt = f"""[JUST RESPOND WITH THE LISTING DONT TALK TO ME, JUST HAVE LISTING IN YOUR RESPONSE] As an Amazon listing expert, create a compliant product listing from this social media content that meets Amazon's quality standards:
 
 Instagram Caption:
 {caption}
@@ -33,12 +33,45 @@ Instagram Caption:
 Video Transcription:
 {transcription}
 
-Please format the response as a complete Amazon product listing including:
-1. Product Title
-2. Key Features/Bullet Points
+Generate a structured listing with EXACTLY [JUST KEEP THE ONE WHERE YOU ARE NOT SURE AS PLACEHOLDERS]:
+
+1. Product Title (max 200 characters)
+- Format: [Brand] + [Model] + [Product Type] + [Key Feature]
+- Example: "ArjunWellness Pro-X Smart Fitness Tracker with Heart Rate Monitor"
+
+2. Five (5) Key Features (bullet points)
+- Start each with a benefit
+- No promotional language
+- Factual, specific details only
+
 3. Product Description
-4. Technical Details
-5. Additional Information
+- No HTML tags
+- No promotional claims
+- Structured in clear paragraphs
+- Focus on technical specifications
+- Avoid subjective statements
+
+4. Technical Details (as key-value pairs)
+- Brand:
+- Model:
+- Dimensions:
+- Weight:
+- Battery Life:
+- Connectivity:
+- Compatibility:
+- Warranty:
+
+5. Search Terms (5 relevant keywords)
+- No brand names
+- No subjective terms
+- No competitor references
+
+Ensure all content:
+- Contains no medical claims
+- Follows Amazon's restricted keywords policy
+- Uses factual, verifiable information only
+- Complies with category-specific requirements
+- Maintains professional language
 """
 
     # Setup Claude AI request
@@ -51,7 +84,7 @@ Please format the response as a complete Amazon product listing including:
     ]
     
     data = {
-        "model": "claude-3-haiku-20240307",
+        "model": "claude-3-5-sonnet-20241022",
         "messages": messages,
         "max_tokens": 1024,
         "stream": False
