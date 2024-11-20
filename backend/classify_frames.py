@@ -15,15 +15,28 @@ model = load_model("keras_model.h5", compile=False, custom_objects={'DepthwiseCo
 
 class_names = open("labels.txt", "r").readlines()
 
-def classify_and_move_images(shortcode, frames_base_dir):
+def classify_and_move_images(shortcode, frames_base_dir, request_id, progress_lock, progress_store):
     input_dir = os.path.join(frames_base_dir, f"output_frames_{shortcode}")
     relevant_dir = os.path.join(input_dir, "relevant")
     non_relevant_dir = os.path.join(input_dir, "non-relevant")
     os.makedirs(relevant_dir, exist_ok=True)
     os.makedirs(non_relevant_dir, exist_ok=True)
-    for filename in os.listdir(input_dir):
+    
+    # Get total number of images
+    images = [f for f in os.listdir(input_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+    total_images = len(images)
+    processed_images = 0
+    
+    for filename in images:
         if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
             image_path = os.path.join(input_dir, filename)
+            # ... (existing classification code) ...
+            
+            processed_images += 1
+            # Update progress (40% allocated for this step)
+            progress = 40 + (processed_images / total_images * 40)
+            with progress_lock:
+                progress_store[request_id]["progress"] = min(80, progress)
             data = np.ndarray(shape=(1, 224, 224, 3), dtype=np.float32)
             image = Image.open(image_path).convert("RGB")
             size = (224, 224)

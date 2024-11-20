@@ -2,13 +2,13 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { FiLink, FiArrowRight } from 'react-icons/fi';
 
-function InstagramForm({ onProcess }) {
+function InstagramForm({ onSubmit }) {
   const [url, setUrl] = useState('');
   const [isFocused, setIsFocused] = useState(false);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onProcess(url);
+    onSubmit(url);
   };
 
   return (
