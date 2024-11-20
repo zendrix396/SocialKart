@@ -17,7 +17,9 @@ cookies.ini
 log.txt
 cfg
 pyld
+service_account.json
 hdr
+__pycache__/
 
 # npm
 package-lock.json
