@@ -78,3 +78,19 @@ typings/
 
 # next.js build output
 .next
+
+# Python cache
+__pycache__/
+
+# Docker
+docker/
+
+# Media
+media/
+
+# Keras model
+keras_model.h5
+
+# Shell and batch scripts
+*.sh
+*.bat
