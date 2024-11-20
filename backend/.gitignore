@@ -88,10 +88,3 @@ docker/
 
 # Media
 media/
-
-# Keras model
-keras_model.h5
-
-# Shell and batch scripts
-*.sh
-*.bat
