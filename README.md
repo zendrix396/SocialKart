@@ -43,7 +43,7 @@ Develop a system that seamlessly converts social media content into comprehensiv
 
 1. Clone the repository
 ```bash
-git clone https://github.com/yourusername/socialkart.git
+git clone https://github.com/YusiferZendric/SocialKart.git
 cd socialkart
 ```
 2. Install frontend dependencies
