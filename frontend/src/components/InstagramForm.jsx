@@ -12,7 +12,7 @@ function InstagramForm({ onSubmit }) {
   };
 
   return (
-    <motion.form 
+    <motion.form
       onSubmit={handleSubmit}
       className="space-y-6"
       initial={{ opacity: 0, y: 20 }}
