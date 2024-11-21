@@ -20,14 +20,14 @@ function InstagramForm({ onSubmit }) {
       transition={{ duration: 0.5 }}
     >
       <div className="space-y-2">
-        <label className="block text-gray-300 text-sm font-medium mb-2 flex items-center">
+        <label className="block text-gray-700 text-sm font-medium mb-2 flex items-center">
           <FiLink className="mr-2" />
           Instagram Post URL
         </label>
         
         <div className="relative">
           <motion.div
-            className={`absolute -inset-0.5 bg-gradient-to-r from-pink-500 via-blue-400 to-yellow-500 rounded-xl blur opacity-75 transition-opacity duration-300 ${
+            className={`absolute -inset-0.5 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl blur opacity-75 transition-opacity duration-300 ${
               isFocused ? 'opacity-100' : 'opacity-0'
             }`}
             animate={{ opacity: isFocused ? 0.75 : 0 }}
@@ -41,10 +41,10 @@ function InstagramForm({ onSubmit }) {
             onBlur={() => setIsFocused(false)}
             required
             placeholder="https://instagram.com/p/..."
-            className="block w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg 
-                     focus:outline-none focus:ring-2 focus:ring-blue-400 
-                     placeholder-gray-500 relative transition-all duration-300
-                     backdrop-blur-sm"
+            className="block w-full px-4 py-3 bg-white border border-gray-200 rounded-lg 
+                     focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400
+                     placeholder-gray-400 relative transition-all duration-300
+                     shadow-sm"
           />
         </div>
       </div>
@@ -57,7 +57,7 @@ function InstagramForm({ onSubmit }) {
                    text-white font-medium py-3 px-6 rounded-lg
                    transform transition-all duration-200
                    hover:scale-[1.02] active:scale-[0.98]
-                   shadow-lg hover:shadow-xl
+                   shadow-md hover:shadow-lg
                    disabled:opacity-50 disabled:cursor-not-allowed"
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
@@ -70,7 +70,7 @@ function InstagramForm({ onSubmit }) {
       {/* Optional: URL Preview */}
       {url && (
         <motion.div 
-          className="text-sm text-gray-400 truncate px-4"
+          className="text-sm text-gray-600 truncate px-4"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
         >
