@@ -20,7 +20,7 @@ function InstagramForm({ onSubmit }) {
       transition={{ duration: 0.5 }}
     >
       <div className="space-y-2">
-        <label className="block text-gray-700 text-sm font-medium mb-2 flex items-center">
+        <label className="text-gray-700 text-sm font-medium mb-2 flex items-center">
           <FiLink className="mr-2" />
           Instagram Post URL
         </label>
