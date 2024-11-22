@@ -3,82 +3,130 @@ import shutil
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import base64
-from video_caption_grabber import grab_post
+from video_caption_grabber import grab_post, process_product_background
 from separate_frames import video_to_frames
 from classify_frames import classify_and_move_images
 from transcribe_video import transcribe_video
 from parse_gemini import parse_content
 import threading
 import uuid
+import psutil  # Add this import at the top of your file
+import atexit
 from utils import parse_claude_response, process_image
+from threading import Thread, Lock
+import time
 app = Flask(__name__)
 CORS(app)
 os.makedirs("posts", exist_ok=True)
 
 # Progress and result stores
 progress_store = {}
-progress_lock = threading.Lock()
+progress_lock = Lock()
 
+@app.route('/cleanup', methods=['POST'])
+def cleanup():
+    try:
+        if os.path.exists("posts"):
+            print("Found posts directory, attempting cleanup...")
+            
+            # Force close any open file handles in the posts directory
+            for proc in psutil.process_iter(['pid', 'open_files']):
+                try:
+                    for file in proc.info['open_files'] or []:
+                        if 'posts' in file.path:
+                            try:
+                                proc.kill()
+                            except:
+                                pass
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
+
+            # Try multiple times to remove the directory
+            max_attempts = 3
+            for attempt in range(max_attempts):
+                try:
+                    shutil.rmtree("posts", ignore_errors=True)
+                    # Double check if directory is really gone
+                    if not os.path.exists("posts"):
+                        break
+                    print(f"Attempt {attempt + 1} to remove directory")
+                except Exception as e:
+                    print(f"Attempt {attempt + 1} failed: {e}")
+                    time.sleep(1)  # Wait a second before next attempt
+            
+            # Final force remove if directory still exists
+            if os.path.exists("posts"):
+                os.system('rm -rf posts' if os.name != 'nt' else 'rd /s /q posts')
+        
+        # Create fresh posts directory
+        os.makedirs("posts", exist_ok=True)
+        print("Created fresh posts directory")
+            
+        return jsonify({"message": "Cleanup successful"}), 200
+    except Exception as e:
+        print(f"Error during cleanup: {e}")
+        return jsonify({"error": str(e)}), 500
 result_store = {}
 result_lock = threading.Lock()
 def process_instagram_post_async(request_id, shortcode):
     try:
-        # Step 1: Download media and caption (10% of total progress)
+        # Step 1: Download media and caption (20% of total progress)
         with progress_lock:
             progress_store[request_id] = {
                 "current_step": "Downloading media and caption...",
                 "progress": 0
             }
-        grab_post(shortcode, "posts")
-        with progress_lock:
-            progress_store[request_id]["progress"] = 10
+        
+        post_info = grab_post(shortcode, "posts")
+        if not post_info:
+            raise Exception("Failed to get post information")
 
-        # Step 2: Extract frames (30% of total progress)
         with progress_lock:
-            progress_store[request_id] = {
-                "current_step": "Separating frames...",
-                "progress": 10
-            }
-        video_path = f"posts/post_{shortcode}/video.mp4"
-        video_to_frames(video_path, "posts", shortcode, request_id, progress_lock, progress_store)
+            progress_store[request_id]["progress"] = 20
 
-        # Step 3: Classify frames (40% of total progress)
-        with progress_lock:
-            progress_store[request_id] = {
-                "current_step": "Classifying frames...",
-                "progress": 40
-            }
-        classify_and_move_images(shortcode, "posts", request_id, progress_lock, progress_store)
+        if post_info.get('is_video', False):  # Safely check if it's a video
+            # Process video post
+            video_path = f"posts/post_{shortcode}/video.mp4"
+            
+            # Video processing steps...
+            with progress_lock:
+                progress_store[request_id]["current_step"] = "Separating frames..."
+                progress_store[request_id]["progress"] = 20
+            video_to_frames(video_path, "posts", shortcode, request_id, progress_lock, progress_store)
 
-        # Step 4: Transcribe video (15% of total progress)
-        with progress_lock:
-            progress_store[request_id] = {
-                "current_step": "Transcribing audio...",
-                "progress": 80
-            }
-        transcribe_video(video_path, "posts", shortcode)
+            with progress_lock:
+                progress_store[request_id]["current_step"] = "Classifying frames..."
+                progress_store[request_id]["progress"] = 40
+            classify_and_move_images(shortcode, "posts", request_id, progress_lock, progress_store)
 
-        # Step 5: Parse content (5% of total progress)
+            with progress_lock:
+                progress_store[request_id]["current_step"] = "Transcribing audio..."
+                progress_store[request_id]["progress"] = 60
+            transcribe_video(video_path, "posts", shortcode)
+        else:
+            # Skip video processing for image posts
+            with progress_lock:
+                progress_store[request_id]["current_step"] = "Processing images..."
+                progress_store[request_id]["progress"] = 60
+            print("Skipping video processing for image post")
+
+        # Continue with content parsing
         with progress_lock:
-            progress_store[request_id] = {
-                "current_step": "Generating listing...",
-                "progress": 95
-            }
+            progress_store[request_id]["current_step"] = "Generating listing..."
+            progress_store[request_id]["progress"] = 80
+
         parsed_content = parse_content(shortcode, "posts")
         structured_content = parse_claude_response(parsed_content)
 
-        # Process images with size limit
-        relevant_dir = f"posts/output_frames_{shortcode}/relevant"
+        # Process images from the relevant directory
+        relevant_dir = post_info['relevant_dir']
         images = [img for img in os.listdir(relevant_dir) if img.lower().endswith(('.png', '.jpg', '.jpeg'))]
         image_urls = []
         
-        # Limit number of images and their size
         MAX_IMAGES = 5
-        MAX_IMAGE_SIZE = 1024 * 1024  # 1MB limit per image
-        
-        for img in images[:MAX_IMAGES]:  # Only process first 5 images
+        for img in images[:MAX_IMAGES]:
             try:
-                image_path = f"{relevant_dir}/{img}"
+                image_path = os.path.join(relevant_dir, img)
                 processed_image = process_image(image_path)
                 if processed_image:
                     image_urls.append(processed_image)
@@ -91,7 +139,9 @@ def process_instagram_post_async(request_id, shortcode):
             result_store[request_id] = {
                 'structured_content': structured_content,
                 'raw_content': parsed_content,
-                'images': image_urls[:MAX_IMAGES],  # Ensure we only store limited images
+                'images': image_urls[:MAX_IMAGES],
+                'is_video': post_info.get('is_video', False),
+                'media_count': post_info.get('media_count', 1)
             }
 
         # Process completed
@@ -111,7 +161,10 @@ def process_instagram_post_async(request_id, shortcode):
                 "progress": 0
             }
         # Clean up in case of error
-        shutil.rmtree("posts", ignore_errors=True)
+        # try:
+        #     shutil.rmtree("posts", ignore_errors=True)
+        # except Exception as cleanup_error:
+        #     print(f"Error during cleanup: {cleanup_error}")
 
 @app.route('/process', methods=['POST'])
 def process_instagram_post():
@@ -136,7 +189,35 @@ def process_instagram_post():
     thread.start()
 
     return jsonify({'request_id': request_id}), 202
-
+@app.route('/process_product', methods=['POST'])
+def process_product():
+    try:
+        data = request.json
+        product_name = data.get('product_name')
+        
+        if not product_name:
+            return jsonify({"error": "Product name is required"}), 400
+            
+        # Generate unique request ID
+        request_id = str(uuid.uuid4())
+        
+        # Initialize progress in the store
+        with progress_lock:
+            progress_store[request_id] = {
+                "current_step": "Initializing...",
+                "progress": 0,
+                "error": None
+            }
+        
+        # Start processing in background
+        thread = Thread(target=process_product_background, 
+                       args=(product_name, request_id, progress_store, progress_lock))
+        thread.start()
+        
+        return jsonify({"request_id": request_id})
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 @app.route('/progress/<request_id>', methods=['GET'])
 def get_progress(request_id):
     with progress_lock:

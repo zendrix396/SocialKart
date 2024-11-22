@@ -112,7 +112,7 @@ function Home({ handleProcess, loading, progress, results, requestId }) {
   );
 }
 
-function App() {
+function AppContent() {
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [requestId, setRequestId] = useState(null);
@@ -121,7 +121,35 @@ function App() {
     progress: 0,
     error: null
   });
+  useEffect(() => {
+    const handleBeforeUnload = async () => {
+      try {
+        // Reset all states first
+        setResults(null);
+        setLoading(false);
+        setRequestId(null);
+        setProgress({
+          current_step: '',
+          progress: 0,
+          error: null
+        });
+        
+        // Then attempt cleanup
+        await fetch('http://localhost:5000/cleanup', {
+          method: 'POST',
+          keepalive: true  // This ensures the request completes even if page is unloading
+        });
+      } catch (error) {
+        console.error('Cleanup error:', error);
+      }
+    };
 
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
   useEffect(() => {
     let interval = null;
     if (requestId && loading) {
@@ -187,7 +215,7 @@ function App() {
     };
   }, [requestId, loading]); // Added loading to dependencies
 
-  const handleProcess = async (url) => {
+  const handleProcess = async (submission) => {
     setLoading(true);
     setResults(null);
     setProgress({
@@ -197,11 +225,17 @@ function App() {
     });
 
     try {
-      const response = await fetch('http://localhost:5000/process', {
+      const endpoint = submission.type === 'url' ? '/process' : '/process_product';
+      const payload = submission.type === 'url' 
+        ? { url: submission.data }
+        : { product_name: submission.data };
+
+      const response = await fetch(`http://localhost:5000${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify(payload),
       });
+      
       const data = await response.json();
       if (response.ok) {
         setRequestId(data.request_id);
@@ -216,8 +250,6 @@ function App() {
   };
 
   return (
-    <ListingProvider>
-      <BrowserRouter>
         <div className="min-h-screen bg-gray-50">
           <Navbar />
           
@@ -251,8 +283,6 @@ function App() {
             </div>
           </footer>
         </div>
-      </BrowserRouter>
-    </ListingProvider>
   );
 }
 
@@ -272,6 +302,16 @@ function About() {
         streamline their product listing process.
       </p>
     </motion.div>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <ListingProvider>
+        <AppContent />
+      </ListingProvider>
+    </BrowserRouter>
   );
 }
 

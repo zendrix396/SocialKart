@@ -33,12 +33,11 @@ def classify_and_move_images(shortcode, frames_base_dir, request_id, progress_lo
     images = [f for f in os.listdir(input_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
     images.sort(key=get_frame_number)
     
-    # Filter for every 30th frame
-    images_to_process = [img for img in images if get_frame_number(img) % 30 == 1]
-    total_images = len(images_to_process)
+    # Process all frames (removed the filtering since frames are already at intervals)
+    total_images = len(images)
     processed_images = 0
     
-    for filename in images_to_process:
+    for filename in images:
         if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
             image_path = os.path.join(input_dir, filename)
             

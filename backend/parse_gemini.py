@@ -100,7 +100,7 @@ def parse_claude_response(content):
     ]
     
     data = {
-        "model": "claude-3-haiku-20240307",
+        "model": "claude-3-5-sonnet-20241022",
         "messages": messages,
         "max_tokens": 1024,
         "stream": False
