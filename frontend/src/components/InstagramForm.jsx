@@ -6,7 +6,7 @@ import ProductForm from './ProductForm';
 function InstagramForm({ onSubmit }) {
   const [url, setUrl] = useState('');
   const [isFocused, setIsFocused] = useState(false);
-  const [mode, setMode] = useState('url'); // 'url' or 'product'
+  const [mode, setMode] = useState('url'); 
 
   const handleUrlSubmit = (e) => {
     e.preventDefault();

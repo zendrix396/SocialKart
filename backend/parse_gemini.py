@@ -6,7 +6,6 @@ from pathlib import Path
 
 def parse_content(shortcode, posts_dir):
     def read_file_safe(file_path):
-        """Helper function to safely read files with different encodings"""
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 return f.read()
@@ -19,12 +18,10 @@ def parse_content(shortcode, posts_dir):
         except FileNotFoundError:
             return None
 
-    # Read caption and transcribed text
     post_dir = Path(posts_dir) / f'post_{shortcode}'
     caption = read_file_safe(post_dir / 'caption.txt') or 'No Instagram caption found.'
     transcription = read_file_safe(post_dir / 'captions.txt') or 'No transcribed text found.'
 
-    # Prepare prompt for Claude
     prompt = f"""[JUST RESPOND WITH THE LISTING DONT TALK TO ME, JUST HAVE LISTING IN YOUR RESPONSE] As an Amazon listing expert, create a compliant product listing from this social media content that meets Amazon's quality standards:
 From this raw Information Below
 [{caption}, {transcription}]
@@ -90,7 +87,6 @@ def parse_claude_response(content):
     ]
 """
 
-    # Setup Claude AI request
     url = "http://127.0.0.1:8444/v1/chat/completions"
     headers = {"Content-Type": "application/json"}
     
@@ -107,13 +103,11 @@ def parse_claude_response(content):
     }
 
     try:
-        # Start Claude endpoint if not running
         if not hasattr(parse_content, 'claude_started'):
             threading.Thread(target=lambda: os.system("node clewd.js"), daemon=True).start()
-            time.sleep(3)  # Wait for endpoint to start
+            time.sleep(3)  
             parse_content.claude_started = True
 
-        # Make request to Claude
         response = requests.post(url, headers=headers, json=data)
         
         if response.status_code == 200:

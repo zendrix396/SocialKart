@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FiEdit2, FiImage, FiCheck, FiX, FiEye } from 'react-icons/fi';
+import { FiCheck, FiEye } from 'react-icons/fi';
 import { storage, StorageKeys } from '../utils/storage';
 
 function ListingEditor() {
@@ -25,7 +25,7 @@ function ListingEditor() {
 
       setContent({
         ...storedContent.structured_content,
-        price: storedContent.structured_content.price || 'XX.XX' // Add default price
+        price: storedContent.structured_content.price || 'XX.XX' 
       });
       setAvailableImages(storedImages || []);
       setSelectedImages([]);
@@ -38,14 +38,12 @@ function ListingEditor() {
 
   const handleSave = () => {
     try {
-      // Store updated content
       storage.set(StorageKeys.LISTING_CONTENT, {
         structured_content: content,
         requestId: requestId
       });
       storage.set(StorageKeys.LISTING_IMAGES, selectedImages);
 
-      // Navigate to preview with requestId
       navigate(`/preview/${requestId}`);
     } catch (error) {
       console.error('Error saving:', error);
@@ -80,7 +78,6 @@ function ListingEditor() {
         </div>
       </div>
 
-      {/* Title Editor */}
       <div className="mb-6">
         <label className="block text-sm font-medium mb-2 text-gray-700">Product Title</label>
         <input
@@ -92,7 +89,6 @@ function ListingEditor() {
         />
       </div>
 
-      {/* Price Editor */}
       <div className="mb-6">
         <label className="block text-sm font-medium mb-2 text-gray-700">Price</label>
         <div className="flex items-center">
@@ -110,7 +106,6 @@ function ListingEditor() {
         </div>
       </div>
 
-      {/* Key Features Editor */}
       <div className="mb-6">
         <label className="block text-sm font-medium mb-2 text-gray-700">Key Features</label>
         {content.key_features.map((feature, index) => (
@@ -128,7 +123,6 @@ function ListingEditor() {
         ))}
       </div>
 
-      {/* Description Editor */}
       <div className="mb-6">
         <label className="block text-sm font-medium mb-2 text-gray-700">Description</label>
         <textarea
@@ -139,7 +133,6 @@ function ListingEditor() {
         />
       </div>
 
-      {/* Technical Details Editor */}
       <div className="mb-6">
         <label className="block text-sm font-medium mb-2 text-gray-700">Technical Details</label>
         {Object.entries(content.technical_details).map(([key, value], index) => (
@@ -170,7 +163,6 @@ function ListingEditor() {
         ))}
       </div>
 
-      {/* Search Terms Editor */}
       <div className="mb-6">
         <label className="block text-sm font-medium mb-2 text-gray-700">Search Terms</label>
         {content.search_terms.map((term, index) => (
@@ -188,7 +180,6 @@ function ListingEditor() {
         ))}
       </div>
 
-      {/* Image Selection */}
       <div className="mb-6">
         <label className="block text-sm font-medium mb-2 text-gray-700">
           Select Images (max {maxImages})
@@ -227,7 +218,6 @@ function ListingEditor() {
         </div>
       </div>
 
-      {/* Save Button */}
       <motion.button
         onClick={handleSave}
         className="bg-blue-500 text-white px-8 py-3 rounded-lg font-medium

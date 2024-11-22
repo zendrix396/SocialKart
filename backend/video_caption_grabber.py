@@ -30,14 +30,12 @@ class ProductPostFinder:
             for url in search_urls:
                 time.sleep(2)
                 try:
-                    # Use Instagram's GraphQL API endpoint instead
                     response = self.L.context.get_json(url)
                     
                     if not response or 'data' not in response:
                         continue
                     
                     posts = response.get('data', {}).get('hashtag', {}).get('edge_hashtag_to_media', {}).get('edges', [])
-                    
                     for post_data in posts:
                         if len(found_posts) >= max_posts:
                             break
@@ -71,9 +69,7 @@ class ProductPostFinder:
     def _generate_search_tags(self, product_name):
         base_tag = re.sub(r'[^a-zA-Z0-9]', '', product_name.lower())
         
-        # Updated search URL format
         search_url_template = "https://www.instagram.com/explore/search/keyword/?q=%23{}"
-        
         tags = [
             base_tag,
             f"{base_tag}review",
@@ -84,8 +80,6 @@ class ProductPostFinder:
             "ad",
             "sponsored"
         ]
-        
-        # Convert tags to proper URL format
         search_urls = [search_url_template.format(tag) for tag in tags]
         return search_urls
 
@@ -119,11 +113,9 @@ class ProductPostFinder:
             L.download_post(post, target=shortcode)
             print(f"Post downloaded successfully: {target_dir}")
 
-            # Create relevant directory
             relevant_dir = f"posts/output_frames_{shortcode}/relevant"
             os.makedirs(relevant_dir, exist_ok=True)
 
-            # Create post info dictionary
             post_info = {
                 'is_video': post.is_video,
                 'is_sidecar': post.typename == 'GraphSidecar',
@@ -133,7 +125,6 @@ class ProductPostFinder:
                 'shortcode': shortcode
             }
 
-            # Rename and organize files
             video_files = glob.glob(os.path.join(target_dir, "*.mp4"))
             if video_files:
                 os.rename(video_files[0], os.path.join(target_dir, "video.mp4"))
@@ -144,13 +135,11 @@ class ProductPostFinder:
                 os.rename(caption_files[0], os.path.join(target_dir, "caption.txt"))
                 print("Caption file renamed")
 
-            # Handle images
             image_files = glob.glob(os.path.join(target_dir, "*.jpg"))
             for i, img_file in enumerate(image_files):
                 new_name = f"image_{i+1}.jpg"
                 new_path = os.path.join(target_dir, new_name)
                 os.rename(img_file, new_path)
-                # Copy to relevant directory
                 shutil.copy2(new_path, os.path.join(relevant_dir, new_name))
                 print(f"Image {i+1} processed and copied to relevant directory")
 
@@ -190,7 +179,6 @@ def grab_post(shortcode, posts_dir):
         target_dir = f"posts/post_{shortcode}"
         L.dirname_pattern = target_dir
         
-        # Create directories
         os.makedirs(target_dir, exist_ok=True)
         relevant_dir = f"posts/output_frames_{shortcode}/relevant"
         os.makedirs(relevant_dir, exist_ok=True)
@@ -200,11 +188,9 @@ def grab_post(shortcode, posts_dir):
         print(f"Media type: {post.typename}")
         print(f"Media count: {post.mediacount if hasattr(post, 'mediacount') else 1}")
 
-        # Download the post
         L.download_post(post, target=shortcode)
         print(f"Post downloaded successfully: {target_dir}")
 
-        # Create post info dictionary
         post_info = {
             'is_video': post.is_video,
             'is_sidecar': post.typename == 'GraphSidecar',
@@ -214,14 +200,12 @@ def grab_post(shortcode, posts_dir):
             'shortcode': shortcode
         }
 
-        # Rename and organize files
         if post.is_video:
             video_files = glob.glob(os.path.join(target_dir, "*.mp4"))
             if video_files:
                 os.rename(video_files[0], os.path.join(target_dir, "video.mp4"))
                 print("Video file renamed")
 
-        # Handle images
         image_files = glob.glob(os.path.join(target_dir, "*.jpg"))
         print(f"Found {len(image_files)} image files")
         
@@ -229,17 +213,15 @@ def grab_post(shortcode, posts_dir):
             new_name = f"image_{i+1}.jpg"
             new_path = os.path.join(target_dir, new_name)
             os.rename(img_file, new_path)
-            # Copy to relevant directory
             shutil.copy2(new_path, os.path.join(relevant_dir, new_name))
             print(f"Image {i+1} processed and copied to relevant directory")
 
-        # Handle caption
         caption_files = glob.glob(os.path.join(target_dir, "*.txt"))
         if caption_files:
             os.rename(caption_files[0], os.path.join(target_dir, "caption.txt"))
             print("Caption file renamed")
 
-        print(f"Post info: {post_info}")  # Debug print
+        print(f"Post info: {post_info}")  
         return post_info
 
     except Exception as e:

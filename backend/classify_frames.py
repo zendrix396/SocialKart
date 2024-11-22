@@ -16,7 +16,6 @@ model = load_model("keras_model.h5", compile=False, custom_objects={'DepthwiseCo
 class_names = open("labels.txt", "r").readlines()
 
 def get_frame_number(filename):
-    # Extract frame number from filename (assuming format like "frame_001.jpg")
     match = re.search(r'frame_(\d+)', filename)
     if match:
         return int(match.group(1))
@@ -29,11 +28,9 @@ def classify_and_move_images(shortcode, frames_base_dir, request_id, progress_lo
     os.makedirs(relevant_dir, exist_ok=True)
     os.makedirs(non_relevant_dir, exist_ok=True)
     
-    # Get all images and sort them by frame number
     images = [f for f in os.listdir(input_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
     images.sort(key=get_frame_number)
     
-    # Process all frames (removed the filtering since frames are already at intervals)
     total_images = len(images)
     processed_images = 0
     
@@ -42,12 +39,10 @@ def classify_and_move_images(shortcode, frames_base_dir, request_id, progress_lo
             image_path = os.path.join(input_dir, filename)
             
             processed_images += 1
-            # Update progress (40% allocated for this step)
             progress = 40 + (processed_images / total_images * 40)
             with progress_lock:
                 progress_store[request_id]["progress"] = min(80, progress)
 
-            # Classification logic
             data = np.ndarray(shape=(1, 224, 224, 3), dtype=np.float32)
             image = Image.open(image_path).convert("RGB")
             size = (224, 224)
