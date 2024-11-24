@@ -59,8 +59,8 @@ def classify_and_move_images(shortcode, frames_base_dir, request_id, progress_lo
             print(f"Image: {filename} - Class: {class_name} - Confidence Score: {confidence_score}")
             
             if index == 0:
-                shutil.move(image_path, os.path.join(relevant_dir, filename))
-            elif index == 1:
                 shutil.move(image_path, os.path.join(non_relevant_dir, filename))
+            elif index == 1:
+                shutil.move(image_path, os.path.join(relevant_dir, filename))
 
     print("Frame classification complete.")

@@ -58,13 +58,13 @@ class ProductPostFinder:
                             
                 except Exception as e:
                     print(f"Error processing URL {url}: {e}")
-                    continue
+                    return "Feature under Development!"
                     
             return found_posts
                         
         except Exception as e:
             print(f"Error searching posts: {e}")
-            return []
+            return "Feature under Development!"
 
     def _generate_search_tags(self, product_name):
         base_tag = re.sub(r'[^a-zA-Z0-9]', '', product_name.lower())
@@ -99,22 +99,37 @@ class ProductPostFinder:
 
     def grab_post(shortcode, posts_dir):
         print(f"Starting to grab post with shortcode: {shortcode}")
-        L = instaloader.Instaloader()
-        L.download_video_thumbnails = False
-        L.download_geotags = False
-        L.download_comments = False
-        L.save_metadata = False
-        L.download_pictures = True  # Enable picture download
+        L = instaloader.Instaloader(
+            download_pictures=True,
+            download_videos=True,
+            download_video_thumbnails=False,
+            download_geotags=False,
+            download_comments=False,
+            save_metadata=False
+        )
 
         try:
             post = instaloader.Post.from_shortcode(L.context, shortcode)
             target_dir = f"posts/post_{shortcode}"
-            L.dirname_pattern = f"posts/post_{shortcode}"
-            L.download_post(post, target=shortcode)
-            print(f"Post downloaded successfully: {target_dir}")
-
+            L.dirname_pattern = target_dir
+            
+            os.makedirs(target_dir, exist_ok=True)
             relevant_dir = f"posts/output_frames_{shortcode}/relevant"
             os.makedirs(relevant_dir, exist_ok=True)
+
+            print(f"Downloading post {shortcode}...")
+            print(f"Is video: {post.is_video}")
+            print(f"Media type: {post.typename}")
+            print(f"Media count: {post.mediacount if hasattr(post, 'mediacount') else 1}")
+
+            # Save caption before downloading post
+            caption_path = os.path.join(target_dir, "caption.txt")
+            with open(caption_path, 'w', encoding='utf-8') as f:
+                f.write(post.caption if post.caption else "No caption available")
+            print("Caption saved successfully")
+
+            L.download_post(post, target=shortcode)
+            print(f"Post downloaded successfully: {target_dir}")
 
             post_info = {
                 'is_video': post.is_video,
@@ -125,17 +140,15 @@ class ProductPostFinder:
                 'shortcode': shortcode
             }
 
-            video_files = glob.glob(os.path.join(target_dir, "*.mp4"))
-            if video_files:
-                os.rename(video_files[0], os.path.join(target_dir, "video.mp4"))
-                print("Video file renamed")
-
-            caption_files = glob.glob(os.path.join(target_dir, "*.txt"))
-            if caption_files:
-                os.rename(caption_files[0], os.path.join(target_dir, "caption.txt"))
-                print("Caption file renamed")
+            if post.is_video:
+                video_files = glob.glob(os.path.join(target_dir, "*.mp4"))
+                if video_files:
+                    os.rename(video_files[0], os.path.join(target_dir, "video.mp4"))
+                    print("Video file renamed")
 
             image_files = glob.glob(os.path.join(target_dir, "*.jpg"))
+            print(f"Found {len(image_files)} image files")
+            
             for i, img_file in enumerate(image_files):
                 new_name = f"image_{i+1}.jpg"
                 new_path = os.path.join(target_dir, new_name)
@@ -143,13 +156,15 @@ class ProductPostFinder:
                 shutil.copy2(new_path, os.path.join(relevant_dir, new_name))
                 print(f"Image {i+1} processed and copied to relevant directory")
 
-            print(f"Post info: {post_info}")  # Debug print
+            print(f"Post info: {post_info}")  
             return post_info
 
         except Exception as e:
             print(f"An error occurred in grabbing post: {e}")
+            print(f"Error type: {type(e)}")
+            import traceback
+            traceback.print_exc()
             raise e
-
     def _rename_files(self, target_dir):
         video_files = glob.glob(os.path.join(target_dir, "*.mp4"))
         if video_files:
@@ -230,6 +245,50 @@ def grab_post(shortcode, posts_dir):
         import traceback
         traceback.print_exc()
         raise e
+def search_product_posts(self, product_name, max_posts=10):
+    found_posts = []
+    search_urls = self._generate_search_tags(product_name)
+    
+    try:
+        for url in search_urls:
+            time.sleep(2)
+            try:
+                response = self.L.context.get_json(url)
+                
+                if not response or 'data' not in response:
+                    continue
+                
+                posts = response.get('data', {}).get('hashtag', {}).get('edge_hashtag_to_media', {}).get('edges', [])
+                for post_data in posts:
+                    if len(found_posts) >= max_posts:
+                        break
+                        
+                    post = post_data.get('node')
+                    if not post:
+                        continue
+                        
+                    shortcode = post.get('shortcode')
+                    if not shortcode:
+                        continue
+                        
+                    try:
+                        full_post = instaloader.Post.from_shortcode(self.L.context, shortcode)
+                        if self._is_relevant_sponsored_post(full_post, product_name):
+                            found_posts.append(full_post)
+                    except Exception as e:
+                        print(f"Error fetching post {shortcode}: {e}")
+                        continue
+                        
+            except Exception as e:
+                print(f"Error processing URL {url}: {e}")
+                return "under development"  # Return "under development" for tag search errors
+                
+        return found_posts
+                    
+    except Exception as e:
+        print(f"Error searching posts: {e}")
+        return "under development"  # Return "under development" for general search errors
+
 
 def process_product_request(product_name, username, password):
     finder = ProductPostFinder()
@@ -241,6 +300,9 @@ def process_product_request(product_name, username, password):
     try:
         posts = finder.search_product_posts(product_name)
         
+        if posts == "under development":
+            return {"error": "under development"}
+            
         if not posts:
             return {"error": "No relevant sponsored posts found"}
             

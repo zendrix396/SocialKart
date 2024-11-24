@@ -1,7 +1,7 @@
 import os
 import shutil
 from flask import Flask, request, jsonify
-from flask_cors import CORS
+from flask_cors import CORS, cross_origin 
 from video_caption_grabber import grab_post, process_product_background
 from separate_frames import video_to_frames
 from classify_frames import classify_and_move_images
@@ -10,51 +10,61 @@ from parse_gemini import parse_content
 import threading
 import uuid
 import psutil  
+from flask import send_file
+import re
 from utils import parse_claude_response, process_image
+from flask import send_from_directory
 from threading import Thread, Lock
 import time
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={
+    r"/video/*": {"origins": "*"},  # Add specific CORS rule for video endpoint
+    r"/*": {"origins": "*"}         # General CORS rule
+})
 os.makedirs("posts", exist_ok=True)
 
 progress_store = {}
 progress_lock = Lock()
-
 @app.route('/cleanup', methods=['POST'])
 def cleanup():
     try:
         if os.path.exists("posts"):
-            print("Found posts directory, attempting cleanup...")
-            
-            for proc in psutil.process_iter(['pid', 'open_files']):
+            # Find and kill processes using the video files
+            print("inside cleanup")
+            for proc in psutil.process_iter(['pid', 'name', 'open_files']):
                 try:
-                    for file in proc.info['open_files'] or []:
-                        if 'posts' in file.path:
-                            try:
-                                proc.kill()
-                            except:
-                                pass
-                except (psutil.NoSuchProcess, psutil.AccessDenied):
-                    pass
+                    # Skip if it's our Python process
+                    if proc.name().lower() in ['python.exe', 'python', 'pythonw.exe']:
+                        continue
+                        
+                    for file in proc.open_files():
+                        if 'video.mp4' in file.path and 'posts\\post_' in file.path:
+                            print(f"Killing process {proc.pid} that's using video file")
+                            proc.kill()
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                    continue
 
-            max_attempts = 3
-            for attempt in range(max_attempts):
-                try:
-                    shutil.rmtree("posts", ignore_errors=True)
-                    if not os.path.exists("posts"):
-                        break
-                    print(f"Attempt {attempt + 1} to remove directory")
-                except Exception as e:
-                    print(f"Attempt {attempt + 1} failed: {e}")
-                    time.sleep(1)  
-            
-            if os.path.exists("posts"):
-                os.system('rm -rf posts' if os.name != 'nt' else 'rd /s /q posts')
-        
-        os.makedirs("posts", exist_ok=True)
-        print("Created fresh posts directory")
+            # Small delay to ensure processes are terminated
+            time.sleep(0.1)
+
+            # Now delete the posts directory and its contents
+            for item in os.listdir("posts"):
+                if item.startswith("post_"):
+                    folder_path = os.path.join("posts", item)
+                    try:
+                        shutil.rmtree(folder_path, ignore_errors=True)
+                    except:
+                        if os.name == 'nt':
+                            os.system(f'rd /s /q "{folder_path}" 2>nul')
+                        else:
+                            os.system(f'rm -rf "{folder_path}"')
+
+            # Delete and recreate main posts directory
+            shutil.rmtree("posts", ignore_errors=True)
+            os.makedirs("posts", exist_ok=True)
             
         return jsonify({"message": "Cleanup successful"}), 200
+
     except Exception as e:
         print(f"Error during cleanup: {e}")
         return jsonify({"error": str(e)}), 500
@@ -142,17 +152,38 @@ def process_instagram_post_async(request_id, shortcode):
                 "error": str(e),
                 "progress": 0
             }
-
+@app.route('/video/<shortcode>', methods=['GET'])
+@cross_origin()  # Add CORS support specifically for video
+def get_video(shortcode):
+    try:
+        video_path = f"posts/post_{shortcode}/video.mp4"
+        if os.path.exists(video_path):
+            directory = os.path.dirname(video_path)
+            filename = os.path.basename(video_path)
+            return send_from_directory(directory, filename, mimetype='video/mp4')
+        else:
+            return jsonify({'error': 'Video file not found'}), 404
+                
+    except Exception as e:
+        print(f"Error serving video: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 @app.route('/process', methods=['POST'])
 def process_instagram_post():
     data = request.get_json()
     instagram_url = data.get('url')
+    
     if not instagram_url:
         return jsonify({'error': 'No URL provided.'}), 400
-    try:
-        shortcode = instagram_url.rstrip('/').split('/')[-1]
-    except Exception as e:
-        return jsonify({'error': 'Invalid Instagram URL.'}), 400
+
+    # Regular expression to match both URL formats
+    instagram_pattern = r'https?://(?:www\.)?instagram\.com/p/([A-Za-z0-9_-]+)(?:/?\?.*)?'
+    match = re.match(instagram_pattern, instagram_url)
+
+    if not match:
+        return jsonify({'error': 'Invalid Instagram URL format. Please use a URL like https://www.instagram.com/p/SHORTCODE/'}), 400
+
+    # Extract the shortcode from the matched pattern
+    shortcode = match.group(1)
 
     request_id = str(uuid.uuid4())
     with progress_lock:
