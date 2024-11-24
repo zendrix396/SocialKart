@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { FaInstagram, FaYoutube } from "react-icons/fa";
 import { FiLink, FiShoppingCart } from "react-icons/fi";
 import ProductForm from "./ProductForm";
+import { brownPaper } from "react-syntax-highlighter/dist/cjs/styles/hljs";
 
 function InstagramForm({ onSubmit }) {
   const [url, setUrl] = useState("");
