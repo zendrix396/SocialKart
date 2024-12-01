@@ -108,10 +108,6 @@ npm start
 - Increased sales conversion
 - Better customer experience
 
-## 🎥 Demo
-
-[View Demo Video](https://www.youtube.com/watch?v=jYrmzzykUm4)
-
 ## 🙏 Acknowledgments
 
 - Amazon Sambhav 2024 Hackathon
