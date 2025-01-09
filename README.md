@@ -1,4 +1,4 @@
-# SocialKart 🚀
+# SocialKart
 
 > Transform Social Media Content into Amazon Product Listings with AI
 
