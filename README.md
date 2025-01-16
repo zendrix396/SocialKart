@@ -2,15 +2,15 @@
 
 > Transform Social Media Content into Amazon Product Listings with AI
 
-## 🌟 About
+##  About
 
 SocialKart is an innovative AI-powered solution developed for Amazon Sambhav 2024 Hackathon that automatically converts social media content into professional Amazon product listings. Built by Team LegionVanguard, it streamlines the e-commerce content creation process.
 
-## 🎯 Problem Statement
+##  Problem Statement
 
 Develop a system that seamlessly converts social media content into comprehensive Amazon product listings, enabling buyers to easily compare and purchase products.
 
-## 🛠️ Core Features
+##  Core Features
 
 - **AI Content Extraction**: Automatically pulls content from social media posts
 - **Smart Classification**: ML-powered relevant image identification
@@ -19,7 +19,7 @@ Develop a system that seamlessly converts social media content into comprehensiv
 - **Content Moderation**: Built-in compliance checking
 - **Preview & Edit**: Amazon-like UI for listing customization
 
-## 🔧 Tech Stack
+##  Tech Stack
 
 ### Frontend
 - React.js
@@ -39,7 +39,7 @@ Develop a system that seamlessly converts social media content into comprehensiv
 - Gemini AI
 - Natural Language Processing
 
-## 📦 Installation
+##  Installation
 
 1. Clone the repository
 ```bash
@@ -56,7 +56,7 @@ npm install
 cd backend
 pip install -r requirements.txt
 ```
-## 🚀 Running the Project
+##  Running the Project
 
 1. Start the backend server
 ```bash
@@ -71,14 +71,14 @@ npm start
 
 3. Visit http://localhost:3000 in your browser
 
-## 🤝 Team LegionVanguard
+##  Team LegionVanguard
 
 - **Aditya Singh** - Full Stack Development & AI Integration
 - **Manya Goyal** - Frontend Development & Documentation
 - **Prachi Sharma** - UI/UX & Presentation
 - **Piyush Chaudhary** - Dataset Collection & Classification
 
-## 🔒 Security & Compliance
+##  Security & Compliance
 
 - End-to-end data encryption
 - GDPR compliance
@@ -86,7 +86,7 @@ npm start
 - Amazon marketplace guidelines adherence
 - Secure user data handling
 
-## 🎯 Future Roadmap
+##  Future Roadmap
 
 ### Short Term (3-6 months)
 - Enhanced ML model accuracy
@@ -100,7 +100,7 @@ npm start
 - Subscription-based pricing
 - Multi-platform support
 
-## 📊 Business Impact
+##  Business Impact
 
 - Significant reduction in listing creation time
 - Improved content accuracy
@@ -108,7 +108,7 @@ npm start
 - Increased sales conversion
 - Better customer experience
 
-## 🙏 Acknowledgments
+##  Acknowledgments
 
 - Amazon Sambhav 2024 Hackathon
 - Google Cloud Platform
@@ -116,4 +116,4 @@ npm start
 - Instagram API
 
 ---
-Made with ❤️ by Team LegionVanguard for Amazon Sambhav 2024
+Made with ❤ by Team LegionVanguard for Amazon Sambhav 2024
