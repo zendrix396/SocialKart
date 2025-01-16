@@ -110,10 +110,9 @@ npm start
 
 ##  Acknowledgments
 
-- Amazon Sambhav 2024 Hackathon
 - Google Cloud Platform
 - OpenAI
 - Instagram API
 
 ---
-Made with ❤ by Team LegionVanguard for Amazon Sambhav 2024
+Made with ❤ by Team LegionVanguard
