@@ -4,7 +4,7 @@
 
 ##  About
 
-SocialKart is an innovative AI-powered solution developed for Amazon Sambhav 2024 Hackathon that automatically converts social media content into professional Amazon product listings. Built by Team LegionVanguard, it streamlines the e-commerce content creation process.
+SocialKart is an innovative AI-powered solution that automatically converts social media content into professional Amazon product listings. Built by Team LegionVanguard, it streamlines the e-commerce content creation process.
 
 ##  Problem Statement
 
@@ -110,10 +110,9 @@ npm start
 
 ##  Acknowledgments
 
-- Amazon Sambhav 2024 Hackathon
 - Google Cloud Platform
 - OpenAI
 - Instagram API
 
 ---
-Made with ❤ by Team LegionVanguard for Amazon Sambhav 2024
+Made with ❤ by Team LegionVanguard
