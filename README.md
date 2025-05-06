@@ -2,7 +2,7 @@
 
 > Transform Social Media Content into Amazon Product Listings with AI
 
-Demo: https://socialkart.netlify.app/
+Demo: https://socialkart.netlify.app/ (frontend only)
 ##  About
 
 SocialKart is an innovative AI-powered solution that automatically converts social media content into professional Amazon product listings. Built by Team LegionVanguard, it streamlines the e-commerce content creation process.
