@@ -1,4 +1,4 @@
-﻿import os
+import os
 import json
 import base64
 from google import genai
@@ -96,7 +96,7 @@ Image-derived cues (when visible):
 
         full_response = ""
         for chunk in client.models.generate_content_stream(
-            model="gemini-2.5-flash",
+            model="gemini-3-flash-preview",
             contents=contents,
             config=generate_content_config,
         ):
