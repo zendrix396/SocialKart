@@ -27,7 +27,86 @@ CORS(app)
 
 # Base directory for all temporary processing
 TEMP_PROCESSING_DIR = "temp_processing"
+# How long to keep generated artifacts accessible to the frontend
+DATA_TTL_SECONDS = 600  # 10 minutes
+# Index file to map shortcode -> request_id for reuse
+INDEX_PATH = os.path.join(TEMP_PROCESSING_DIR, "index.json")
 os.makedirs(TEMP_PROCESSING_DIR, exist_ok=True)
+
+
+def _read_index():
+    try:
+        if os.path.exists(INDEX_PATH):
+            with open(INDEX_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {}
+
+
+def _write_index(index_data):
+    try:
+        os.makedirs(TEMP_PROCESSING_DIR, exist_ok=True)
+        with open(INDEX_PATH, "w", encoding="utf-8") as f:
+            json.dump(index_data, f)
+    except Exception:
+        pass
+
+
+def _remaining_ttl_seconds(request_dir):
+    now_ts = time.time()
+    try:
+        last_mtime = os.path.getmtime(request_dir)
+    except Exception:
+        return 0
+    for root, _, files in os.walk(request_dir):
+        for fname in files:
+            try:
+                last_mtime = max(last_mtime, os.path.getmtime(os.path.join(root, fname)))
+            except Exception:
+                pass
+    spent = now_ts - last_mtime
+    remain = int(max(0, DATA_TTL_SECONDS - spent))
+    return remain
+
+
+def _emit_cached_result(sid, shortcode):
+    index = _read_index()
+    entry = index.get(shortcode)
+    if not entry:
+        return False
+    request_id = entry.get("request_id")
+    if not request_id:
+        return False
+    request_dir = os.path.join(TEMP_PROCESSING_DIR, request_id)
+    result_path = os.path.join(request_dir, "result.json")
+    final_images_dir = os.path.join(request_dir, "relevant_final")
+    if not (os.path.exists(result_path) and os.path.isdir(final_images_dir)):
+        return False
+
+    remaining = _remaining_ttl_seconds(request_dir)
+    if remaining <= 0:
+        return False
+
+    try:
+        with open(result_path, 'r', encoding='utf-8') as f:
+            structured_content = json.load(f)
+    except Exception:
+        return False
+
+    image_files = sorted(os.listdir(final_images_dir))
+    final_images = [f"/image/{request_id}/{filename}" for filename in image_files[:30]]
+
+    expiration_time = datetime.utcnow() + timedelta(seconds=remaining)
+    socketio.emit('result', {
+        'structured_content': structured_content,
+        'images': final_images,
+        'request_id': request_id,
+        'expiration_timestamp': expiration_time.isoformat() + 'Z',
+        'expires_in_seconds': remaining
+    }, room=sid)
+    socketio.sleep(0.05)
+    return True
 
 
 @app.route('/image/<request_id>/<filename>')
@@ -39,6 +118,15 @@ def get_image(request_id, filename):
     image_dir = os.path.join(TEMP_PROCESSING_DIR, request_id, "relevant_final")
     return send_from_directory(image_dir, filename)
 
+
+@app.route('/video/<request_id>/video.mp4')
+def get_video(request_id):
+    """Serve the processed video file for previews."""
+    request_dir = os.path.join(TEMP_PROCESSING_DIR, request_id)
+    video_path = os.path.join(request_dir, "video.mp4")
+    if not os.path.exists(video_path):
+        return "Video not found", 404
+    return send_from_directory(request_dir, "video.mp4")
 
 @app.route('/results/<request_id>', methods=['GET'])
 def get_past_result(request_id):
@@ -83,11 +171,30 @@ def cleanup_request(request_id):
 def cleanup_all():
     try:
         if os.path.exists(TEMP_PROCESSING_DIR):
+            now_ts = time.time()
+            deleted = []
+            kept = []
             for entry in os.listdir(TEMP_PROCESSING_DIR):
                 entry_path = os.path.join(TEMP_PROCESSING_DIR, entry)
-                if os.path.isdir(entry_path):
+                if not os.path.isdir(entry_path):
+                    continue
+
+                # Determine last modification time inside the request dir
+                last_mtime = os.path.getmtime(entry_path)
+                for root, _, files in os.walk(entry_path):
+                    for fname in files:
+                        try:
+                            last_mtime = max(last_mtime, os.path.getmtime(os.path.join(root, fname)))
+                        except Exception:
+                            pass
+
+                if (now_ts - last_mtime) > DATA_TTL_SECONDS:
                     shutil.rmtree(entry_path)
-            return jsonify({"message": "All temporary data cleaned."}), 200
+                    deleted.append(entry)
+                else:
+                    kept.append(entry)
+
+            return jsonify({"message": "Cleanup completed.", "deleted": deleted, "kept": kept}), 200
         else:
             return jsonify({"message": "No temp directory found."}), 200
     except Exception as e:
@@ -129,15 +236,21 @@ def process_instagram_post_sync(sid, shortcode, request_id, request_dir):
         with open(os.path.join(request_dir, 'result.json'), 'w') as f:
             json.dump(parsed_content, f)
 
+        # Update index for cache reuse
+        idx = _read_index()
+        idx[shortcode] = {"request_id": request_id, "ts": time.time()}
+        _write_index(idx)
+
         final_images = [f"/image/{request_id}/{f}" for f in sorted(os.listdir(os.path.join(request_dir, "relevant_final")))[:30]]
 
-        expiration_time = datetime.now() + timedelta(minutes=10)
+        expiration_time = datetime.utcnow() + timedelta(seconds=DATA_TTL_SECONDS)
         
         socketio.emit('result', {
             'structured_content': parsed_content,
             'images': final_images,
             'request_id': request_id,
-            'expiration_timestamp': expiration_time.isoformat()
+            'expiration_timestamp': expiration_time.isoformat() + 'Z',
+            'expires_in_seconds': DATA_TTL_SECONDS
         }, room=sid)
         
         socketio.sleep(0.1)
@@ -158,6 +271,11 @@ def handle_start_processing(json_data):
         return
 
     shortcode = match.group(1)
+
+    # Try to serve from cache if still valid
+    if _emit_cached_result(sid, shortcode):
+        return
+
     request_id = str(uuid.uuid4())
     request_dir = os.path.join(TEMP_PROCESSING_DIR, request_id)
     os.makedirs(request_dir, exist_ok=True)

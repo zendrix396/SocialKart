@@ -174,11 +174,14 @@ function ListingEditor() {
   const [content, setContent] = useState(null);
   const [selectedImages, setSelectedImages] = useState([]);
   const [availableImages, setAvailableImages] = useState([]);
+  const [backendUrl, setBackendUrl] = useState("");
   const maxSelectableImages = 30; // Allow up to 30 images to be selected
 
   useEffect(() => {
     try {
       const decodedData = JSON.parse(atob(requestId));
+      const bu = decodedData.backendUrl || "";
+      setBackendUrl(bu);
       
       const { structured_content, images } = decodedData;
 
@@ -197,7 +200,7 @@ function ListingEditor() {
         price: structured_content.price || 'XXXX.XX'
       });
       
-      // The images are now full URLs from the backend
+      // The images are paths from backend. Store as-is and prefix during render.
       setAvailableImages(images || []);
       // Pre-select the top 5 images by default for convenience
       setSelectedImages(images.slice(0, 5) || []);
@@ -399,7 +402,7 @@ function ListingEditor() {
                 }}
               >
                 <img
-                  src={`http://localhost:5000${imgSrc}`}
+                  src={`${backendUrl}${imgSrc}`}
                   alt={`Product ${index + 1}`}
                   className="w-full h-48 object-cover"
                 />

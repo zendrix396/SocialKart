@@ -11,24 +11,33 @@ function ListingPreview() {
   const [selectedMedia, setSelectedMedia] = useState(0);
   const [videoUrl, setVideoUrl] = useState(null);
   const [mediaItems, setMediaItems] = useState([]);
+  const [backendUrl, setBackendUrl] = useState("");
+  const [rawImages, setRawImages] = useState([]);
+  const [videoRequestId, setVideoRequestId] = useState(null);
 
   useEffect(() => {
     try {
       const storedContent = storage.get(StorageKeys.LISTING_CONTENT);
       const storedImages = storage.get(StorageKeys.LISTING_IMAGES); // These are URL paths like "/image/..."
 
-      if (!storedContent || !storedContent.requestId || storedContent.requestId !== requestId) {
-        console.log('Invalid or missing data, redirecting to home');
+      if (!storedContent || !storedContent.requestId) {
+        console.log('Missing stored content, redirecting to home');
         navigate('/');
         return;
       }
       
       const shortcode = storedContent.structured_content.shortcode;
-      const videoRequestId = storedContent.requestId; // The request_id for the video URL
+      const reqId = storedContent.requestId; // The request_id for the video URL
+      setVideoRequestId(reqId);
 
-      // The video URL is now tied to the request_id, not the shortcode
-      if (videoRequestId) {
-        setVideoUrl(`http://localhost:5000/video/${videoRequestId}/video.mp4`);
+      const base = (storedContent.backendUrl || '').replace(/\/$/, '');
+      if (base) {
+        setBackendUrl(base);
+      } else {
+        fetch('/config.json')
+          .then(res => res.json())
+          .then(cfg => setBackendUrl((cfg.backendUrl || '').replace(/\/$/, '')))
+          .catch(() => setBackendUrl(''));
       }
 
       setContent({
@@ -37,30 +46,7 @@ function ListingPreview() {
       });
 
       const images = storedImages || [];
-      const media = [];
-      
-      // Add images first, constructing the full URL
-      images.forEach((imgPath, index) => {
-        media.push({
-          type: 'image',
-          src: `http://localhost:5000${imgPath}`, // Construct full URL
-          index: index
-        });
-      });
-      
-      // Add video if available
-      if (videoRequestId) {
-        const videoSrc = `http://localhost:5000/video/${videoRequestId}/video.mp4`;
-        media.push({
-          type: 'video',
-          src: videoSrc,
-          // Use the first selected image as a thumbnail
-          thumbnail: images[0] ? `http://localhost:5000${images[0]}` : null 
-        });
-      }
-      
-      setMediaItems(media);
-      console.log('Media items created:', media);
+      setRawImages(images);
       console.log('Shortcode:', shortcode);
       console.log('Images count:', images.length);
 
@@ -69,6 +55,37 @@ function ListingPreview() {
       navigate('/');
     }
   }, [navigate, requestId]);
+
+  useEffect(() => {
+    if (!backendUrl) return;
+
+    // Helper to resolve absolute URL
+    const abs = (p) => (p && /^https?:\/\//i.test(p) ? p : `${backendUrl}${p || ''}`);
+
+    if (videoRequestId) {
+      setVideoUrl(abs(`/video/${videoRequestId}/video.mp4`));
+    }
+
+    const media = [];
+    rawImages.forEach((imgPath, index) => {
+      media.push({
+        type: 'image',
+        src: abs(imgPath),
+        index: index
+      });
+    });
+
+    if (videoRequestId) {
+      const videoSrc = abs(`/video/${videoRequestId}/video.mp4`);
+      media.push({
+        type: 'video',
+        src: videoSrc,
+        // Use the first selected image as a thumbnail
+        thumbnail: rawImages[0] ? abs(rawImages[0]) : null 
+      });
+    }
+    setMediaItems(media);
+  }, [backendUrl, rawImages, videoRequestId]);
 
   if (!content) {
     return (

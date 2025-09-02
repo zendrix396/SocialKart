@@ -26,8 +26,10 @@ import { ListingProvider } from "./context/ListingContext";
 import { BiTransfer } from "react-icons/bi";
 import "./App.css";
 import io from "socket.io-client";
+import { storage, StorageKeys } from "./utils/storage";
 
-const socket = io("http://localhost:5000");
+// Global socket instance; initialized after config loads
+let socket;
 
 function Navbar() {
   const location = useLocation();
@@ -201,7 +203,7 @@ function Home({ handleProcess, loading, progress, progressText, results, handleC
                 </button>
             </div>
             {/* Pass the backend URL to ResultsDisplay */}
-            <ResultsDisplay data={results} backendUrl="http://localhost:5000" />
+            <ResultsDisplay data={results} backendUrl={results?.backendUrl || ''} />
           </motion.div>
         )}
       </div>
@@ -285,11 +287,28 @@ function Home({ handleProcess, loading, progress, progressText, results, handleC
 }
 
 function AppContent() {
+  const [backendUrl, setBackendUrl] = useState("");
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [progressText, setProgressText] = useState("");
   const cleanupTimerRef = useRef(null);
+
+  // Load backend URL from public/config.json and init socket
+  useEffect(() => {
+    if (backendUrl) return;
+    fetch('/config.json')
+      .then(res => res.json())
+      .then(cfg => {
+        const url = (cfg.backendUrl || '').replace(/\/$/, '');
+        setBackendUrl(url);
+        socket = io(url || undefined);
+      })
+      .catch(() => {
+        setBackendUrl('');
+        socket = io();
+      });
+  }, [backendUrl]);
 
   const handleClear = async (idToClear) => {
     const lastRequestId = idToClear || localStorage.getItem('lastRequestId');
@@ -299,13 +318,19 @@ function AppContent() {
     }
 
     try {
-        await fetch(`http://localhost:5000/cleanup/${lastRequestId}`, { method: 'POST' });
+        if (backendUrl) {
+          await fetch(`${backendUrl}/cleanup/${lastRequestId}`, { method: 'POST' });
+        }
     } catch (error) {
         console.error("Failed to call cleanup endpoint:", error);
     } finally {
         localStorage.removeItem('lastRequestId');
         localStorage.removeItem('expirationTimestamp');
         setResults(null);
+        try {
+          storage.remove(StorageKeys.LISTING_CONTENT);
+          storage.remove(StorageKeys.LISTING_IMAGES);
+        } catch (e) {}
     }
   };
 
@@ -330,6 +355,7 @@ function AppContent() {
   };
 
   useEffect(() => {
+    if (!backendUrl) return;
     // On initial load, wipe local app state and ask backend to cleanup temp files
     try {
       localStorage.removeItem('lastRequestId');
@@ -338,7 +364,7 @@ function AppContent() {
       console.warn('Failed to clear localStorage keys on load:', e);
     }
 
-    fetch('http://localhost:5000/cleanup_all', { method: 'POST' }).catch(err => {
+    fetch(`${backendUrl}/cleanup_all`, { method: 'POST' }).catch(err => {
       console.warn('cleanup_all request failed:', err);
     });
 
@@ -353,14 +379,23 @@ function AppContent() {
       } else {
         console.log(`Found last request ID: ${lastRequestId}. Fetching results...`);
         setLoading(true);
-        fetch(`http://localhost:5000/results/${lastRequestId}`)
+        fetch(`${backendUrl}/results/${lastRequestId}`)
           .then(res => {
             if (!res.ok) throw new Error('Failed to fetch results');
             return res.json();
           })
           .then(json => {
             if (!json.error) {
-              setResults(json);
+              const merged = { ...json, backendUrl };
+              setResults(merged);
+              try {
+                storage.set(StorageKeys.LISTING_CONTENT, {
+                  structured_content: json.structured_content,
+                  requestId: json.request_id,
+                  backendUrl
+                });
+                storage.set(StorageKeys.LISTING_IMAGES, json.images);
+              } catch (e) {}
               scheduleCleanup(lastRequestId, expirationTimestamp); // Schedule cleanup for existing session
             } else {
               setResults({ error: json.error });
@@ -385,15 +420,26 @@ function AppContent() {
     });
 
     socket.on('result', (data) => {
-        setResults(data);
+        const merged = { ...data, backendUrl };
+        setResults(merged);
         setProgress(100);
         setProgressText("Completed!");
         setLoading(false);
-        if (data.request_id && data.expiration_timestamp) {
+        if (data.request_id) {
             localStorage.setItem('lastRequestId', data.request_id);
-            localStorage.setItem('expirationTimestamp', data.expiration_timestamp);
-            scheduleCleanup(data.request_id, data.expiration_timestamp);
+            const expiresMs = (data.expires_in_seconds ?? 600) * 1000;
+            const expireAt = new Date(Date.now() + expiresMs).toISOString();
+            localStorage.setItem('expirationTimestamp', expireAt);
+            scheduleCleanup(data.request_id, expireAt);
         }
+        try {
+          storage.set(StorageKeys.LISTING_CONTENT, {
+            structured_content: data.structured_content,
+            requestId: data.request_id,
+            backendUrl
+          });
+          storage.set(StorageKeys.LISTING_IMAGES, data.images);
+        } catch (e) {}
     });
 
     socket.on('error', (data) => {
@@ -409,7 +455,7 @@ function AppContent() {
         socket.off('error');
         clearTimeout(cleanupTimerRef.current); // Clean up timer on component unmount
     };
-  }, []);
+  }, [backendUrl]);
 
   const handleProcess = async (submission) => {
     clearTimeout(cleanupTimerRef.current);
@@ -420,7 +466,9 @@ function AppContent() {
     setProgress(0);
     setProgressText("Initializing...");
     
-    socket.emit('start_processing', { url: submission.data });
+    if (socket) {
+      socket.emit('start_processing', { url: submission.data });
+    }
   };
   
   // Update handleClear to not need an argument by default
