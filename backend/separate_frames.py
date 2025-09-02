@@ -17,7 +17,7 @@ def video_to_frames(video_path, frames_dir, shortcode):
         if not ret:
             break
             
-        if frame_count % 40 == 0:
+        if frame_count % 10 == 0:
             output_file = os.path.join(output_folder, f"frame_{frame_count:04d}.png")
             cv2.imwrite(output_file, frame)
                 

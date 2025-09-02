@@ -67,7 +67,7 @@ function ResultsDisplay({ data, backendUrl }) {
       </div>
       
       <Link 
-        to={`/edit/${btoa(JSON.stringify(data))}`}
+        to={`/edit/${encodeURIComponent(JSON.stringify(data))}`}
         className="block w-full text-center bg-green-500 text-white font-bold py-3 px-6 rounded-lg hover:bg-green-600 transition-colors"
       >
         Edit & Refine Listing

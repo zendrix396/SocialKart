@@ -179,7 +179,7 @@ function ListingEditor() {
 
   useEffect(() => {
     try {
-      const decodedData = JSON.parse(atob(requestId));
+      const decodedData = JSON.parse(decodeURIComponent(requestId));
       const bu = decodedData.backendUrl || "";
       setBackendUrl(bu);
       
