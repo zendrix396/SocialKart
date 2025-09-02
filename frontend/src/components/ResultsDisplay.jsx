@@ -2,6 +2,14 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 
+// Unicode-safe base64 encoding
+const unicodeBase64Encode = (str) => {
+  // Convert string to UTF-8 bytes, then to base64
+  return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (match, p1) => {
+    return String.fromCharCode(parseInt(p1, 16));
+  }));
+};
+
 function ResultsDisplay({ data, backendUrl }) {
   if (!data) {
     return null;
@@ -67,7 +75,7 @@ function ResultsDisplay({ data, backendUrl }) {
       </div>
       
       <Link 
-        to={`/edit/${encodeURIComponent(JSON.stringify(data))}`}
+        to={`/edit/${unicodeBase64Encode(JSON.stringify(data))}`}
         className="block w-full text-center bg-green-500 text-white font-bold py-3 px-6 rounded-lg hover:bg-green-600 transition-colors"
       >
         Edit & Refine Listing

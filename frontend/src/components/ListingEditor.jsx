@@ -3,6 +3,14 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FiCheck, FiEye, FiEdit2, FiDollarSign, FiList, FiTag, FiImage, FiInfo, FiBox } from 'react-icons/fi';
 import { storage, StorageKeys } from '../utils/storage';
+
+// Unicode-safe base64 decoding
+const unicodeBase64Decode = (str) => {
+  // Decode base64, then convert UTF-8 bytes back to Unicode string
+  return decodeURIComponent(Array.prototype.map.call(atob(str), (c) => {
+    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+  }).join(''));
+};
 function EditableField({ label, icon: Icon, value, onChange, type = "text", placeholder = "", className = "", multiline = false }) {
   const [isEditing, setIsEditing] = useState(false);
   const inputRef = useRef(null);
@@ -179,7 +187,7 @@ function ListingEditor() {
 
   useEffect(() => {
     try {
-      const decodedData = JSON.parse(decodeURIComponent(requestId));
+      const decodedData = JSON.parse(unicodeBase64Decode(requestId));
       const bu = decodedData.backendUrl || "";
       setBackendUrl(bu);
       
