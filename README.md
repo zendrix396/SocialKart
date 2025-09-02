@@ -65,5 +65,3 @@ npm install
 The application will be available at `http://127.0.0.1:3000`.
 
 ---
-
-Developed by **[Aditya](https://github.com/zendrix396)**.
