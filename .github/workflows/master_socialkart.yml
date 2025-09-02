@@ -57,6 +57,7 @@ jobs:
         with:
           name: python-app
       
+      
       - name: Login to Azure
         uses: azure/login@v2
         with:
