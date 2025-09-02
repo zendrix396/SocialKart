@@ -1,119 +1,69 @@
 # SocialKart
 
-> Transform Social Media Content into Amazon Product Listings with AI
+> Transform Social Media Content into E-commerce Product Listings with AI.
 
-Demo: https://socialkart.netlify.app/ (frontend only)
-##  About
+SocialKart is an AI-powered tool that automatically converts Instagram posts into professional product listings. It streamlines the e-commerce content creation process by extracting video frames, transcribing audio, and using AI to generate marketing copy.
 
-SocialKart is an innovative AI-powered solution that automatically converts social media content into professional Amazon product listings. Built by Team LegionVanguard, it streamlines the e-commerce content creation process.
+## Tech Stack
 
-##  Problem Statement
+-   **Frontend**: React, Tailwind CSS, Framer Motion
+-   **Backend**: Python, Flask, Socket.IO
+-   **AI/ML**: Google Gemini, ONNX (for image classification), Instaloader
 
-Develop a system that seamlessly converts social media content into comprehensive Amazon product listings, enabling buyers to easily compare and purchase products.
+## Setup and Running the Project
 
-##  Core Features
+### Prerequisites
 
-- **AI Content Extraction**: Automatically pulls content from social media posts
-- **Smart Classification**: ML-powered relevant image identification
-- **Video Processing**: Frame extraction and speech-to-text conversion
-- **Listing Generation**: AI-powered product description creation
-- **Content Moderation**: Built-in compliance checking
-- **Preview & Edit**: Amazon-like UI for listing customization
+-   Node.js and npm
+-   Python 3.9+ and pip
+-   An Instagram account
+-   A Google Gemini API Key
 
-##  Tech Stack
+### 1. Clone the repository
 
-### Frontend
-- React.js
-- Tailwind CSS
-- Framer Motion
-- React Router
-
-### Backend
-- Flask
-- Python 3.9+
-- TensorFlow/PyTorch
-- OpenCV
-
-### AI/ML
-- Custom Image Classification Models
-- Google Cloud Speech-to-Text
-- Gemini AI
-- Natural Language Processing
-
-##  Installation
-
-1. Clone the repository
 ```bash
 git clone https://github.com/YusiferZendric/SocialKart.git
-cd socialkart
+cd SocialKart
 ```
-2. Install frontend dependencies
-```bash
-cd frontend
-npm install
-```
-3. Install backend dependencies
+
+### 2. Backend Setup
+
 ```bash
 cd backend
 pip install -r requirements.txt
 ```
-##  Running the Project
 
-1. Start the backend server
-```bash
-cd backend
-python app.py
+Create a `.env` file in the `backend` directory and add your credentials:
+
+```env
+# .env
+INSTAGRAM_USERNAME="your_instagram_username"
+INSTAGRAM_PASSWORD="your_instagram_password"
+GEMINI_API_KEY="your_gemini_api_key"
 ```
-2. Start the frontend development server
+
+### 3. Frontend Setup
+
 ```bash
 cd frontend
-npm start
+npm install
 ```
 
-3. Visit http://localhost:3000 in your browser
+### 4. Run the Application
 
-##  Team LegionVanguard
+1.  **Start the Backend**:
+    ```bash
+    # In the /backend directory
+    python app.py
+    ```
+2.  **Start the Frontend**:
+    ```bash
+    # In the /frontend directory
+    npm start
+    ```
 
-- **Aditya Singh** - Full Stack Development & AI Integration
-- **Manya Goyal** - Frontend Development & Documentation
-- **Prachi Sharma** - UI/UX & Presentation
-- **Piyush Chaudhary** - Dataset Collection & Classification
-
-##  Security & Compliance
-
-- End-to-end data encryption
-- GDPR compliance
-- Content verification system
-- Amazon marketplace guidelines adherence
-- Secure user data handling
-
-##  Future Roadmap
-
-### Short Term (3-6 months)
-- Enhanced ML model accuracy
-- Bulk processing capability
-- Advanced content moderation
-- User authentication system
-
-### Long Term (6-12 months)
-- YouTube integration
-- Direct Amazon marketplace integration
-- Subscription-based pricing
-- Multi-platform support
-
-##  Business Impact
-
-- Significant reduction in listing creation time
-- Improved content accuracy
-- Enhanced product visibility
-- Increased sales conversion
-- Better customer experience
-
-##  Acknowledgments
-
-- Google Cloud Platform
-- OpenAI
-- Instagram API
+The application will be available at `http://localhost:3000`.
 
 ---
-Made with ❤ by Team LegionVanguard
+
+Developed by **[Aditya](https://github.com/zendrix396)**.

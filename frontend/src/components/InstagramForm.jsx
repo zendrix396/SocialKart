@@ -3,9 +3,9 @@ import { motion } from "framer-motion";
 import { FaInstagram, FaYoutube } from "react-icons/fa";
 import { FiLink, FiShoppingCart } from "react-icons/fi";
 import ProductForm from "./ProductForm";
-import { brownPaper } from "react-syntax-highlighter/dist/cjs/styles/hljs";
 
-function InstagramForm({ onSubmit }) {
+
+function InstagramForm({ onSubmit, disabled }) {
   const [url, setUrl] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const [mode, setMode] = useState("instagram");
@@ -144,7 +144,7 @@ function InstagramForm({ onSubmit }) {
                disabled:opacity-50 disabled:cursor-not-allowed"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            disabled={!productName}
+            disabled={!productName || disabled}
           >
             <span>Search Product</span>
           </motion.button>
@@ -207,11 +207,11 @@ function InstagramForm({ onSubmit }) {
                      hover:scale-[1.02] active:scale-[0.98]
                      shadow-md hover:shadow-lg
                      disabled:opacity-50 disabled:cursor-not-allowed`}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            disabled={!url}
+            whileHover={{ scale: disabled ? 1 : 1.02 }}
+            whileTap={{ scale: disabled ? 1 : 0.98 }}
+            disabled={!url || disabled}
           >
-            <span>Generate Listing</span>
+            <span>{disabled ? "Processing..." : "Generate Listing"}</span>
           </motion.button>
         </motion.form>
       )}

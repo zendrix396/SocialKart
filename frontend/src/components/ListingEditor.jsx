@@ -174,30 +174,40 @@ function ListingEditor() {
   const [content, setContent] = useState(null);
   const [selectedImages, setSelectedImages] = useState([]);
   const [availableImages, setAvailableImages] = useState([]);
-  const maxImages = 5;
+  const maxSelectableImages = 30; // Allow up to 30 images to be selected
 
   useEffect(() => {
     try {
-      const storedContent = storage.get(StorageKeys.LISTING_CONTENT);
-      const storedImages = storage.get(StorageKeys.LISTING_IMAGES);
+      const decodedData = JSON.parse(atob(requestId));
+      
+      const { structured_content, images } = decodedData;
 
-      if (!storedContent || !storedContent.requestId) {
+      if (!structured_content) {
         navigate('/');
         return;
       }
 
       setContent({
-        ...storedContent.structured_content,
-        price: storedContent.structured_content.price || 'XXXX.XX'  // Changed from XX.XX
+        title: structured_content.product_name || '',
+        description: structured_content.description || '',
+        key_features: structured_content.key_features || [],
+        details: structured_content.technical_details || structured_content.service_details || structured_content.nutritional_info || {},
+        target_audience: structured_content.target_audience || '',
+        seo_keywords: structured_content.seo_keywords || [],
+        price: structured_content.price || 'XXXX.XX'
       });
-      setAvailableImages(storedImages || []);
-      setSelectedImages([]);
+      
+      // The images are now full URLs from the backend
+      setAvailableImages(images || []);
+      // Pre-select the top 5 images by default for convenience
+      setSelectedImages(images.slice(0, 5) || []);
       setLoading(false);
+
     } catch (error) {
       console.error('Error loading data:', error);
       navigate('/');
     }
-  }, [navigate]);
+  }, [navigate, requestId]);
 
   const handleSave = () => {
     try {
@@ -339,22 +349,22 @@ function ListingEditor() {
             </div>
           </div>
           <div className="space-y-3">
-            {Object.entries(content.technical_details).map(([key, value], index) => (
+            {Object.entries(content.details || {}).map(([key, value], index) => (
               <EditableTechnicalDetail
                 key={index}
                 keyName={key}
                 value={value}
                 onKeyChange={(e) => {
-                  const newDetails = { ...content.technical_details };
+                  const newDetails = { ...content.details };
                   const oldValue = newDetails[key];
                   delete newDetails[key];
                   newDetails[e.target.value] = oldValue;
-                  setContent({ ...content, technical_details: newDetails });
+                  setContent({ ...content, details: newDetails });
                 }}
                 onValueChange={(e) => {
-                  const newDetails = { ...content.technical_details };
+                  const newDetails = { ...content.details };
                   newDetails[key] = e.target.value;
-                  setContent({ ...content, technical_details: newDetails });
+                  setContent({ ...content, details: newDetails });
                 }}
               />
             ))}
@@ -369,31 +379,31 @@ function ListingEditor() {
               <h3 className="text-lg font-medium text-gray-800">Product Images</h3>
             </div>
             <span className="text-sm text-gray-500">
-              Selected: {selectedImages.length}/{maxImages}
+              Selected: {selectedImages.length}/{maxSelectableImages} (from {availableImages.length} available)
             </span>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {availableImages.map((img, index) => (
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {availableImages.map((imgSrc, index) => (
               <motion.div
                 key={index}
                 className={`relative cursor-pointer rounded-xl overflow-hidden shadow-md 
                            hover:shadow-lg transition-all duration-200
-                           ${selectedImages.includes(img) ? 'ring-2 ring-blue-500' : ''}`}
+                           ${selectedImages.includes(imgSrc) ? 'ring-2 ring-blue-500' : ''}`}
                 whileHover={{ scale: 1.02 }}
                 onClick={() => {
-                  if (selectedImages.includes(img)) {
-                    setSelectedImages(selectedImages.filter(i => i !== img));
-                  } else if (selectedImages.length < maxImages) {
-                    setSelectedImages([...selectedImages, img]);
+                  if (selectedImages.includes(imgSrc)) {
+                    setSelectedImages(selectedImages.filter(i => i !== imgSrc));
+                  } else if (selectedImages.length < maxSelectableImages) {
+                    setSelectedImages([...selectedImages, imgSrc]);
                   }
                 }}
               >
                 <img
-                  src={`data:image/png;base64,${img}`}
+                  src={`http://localhost:5000${imgSrc}`}
                   alt={`Product ${index + 1}`}
                   className="w-full h-48 object-cover"
                 />
-                {selectedImages.includes(img) && (
+                {selectedImages.includes(imgSrc) && (
                   <motion.div 
                     className="absolute top-2 right-2 bg-blue-500 rounded-full p-2"
                     initial={{ scale: 0 }}

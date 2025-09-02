@@ -1,0 +1,9 @@
+# Ignore Python virtual environments
+backend/venv/
+audio_worker/venv/
+
+# Ignore local files
+backend/config.py
+
+# Ignore node modules
+frontend/node_modules/

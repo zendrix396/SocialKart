@@ -4,9 +4,9 @@ export const StorageKeys = {
   };
   
   const compressImages = (images) => {
-    // Only store first 10 images if there are more
-    return images.slice(0, 10).map(img => {
-      // If image string is too long, we could implement compression here
+    // Store up to 30 images
+    return images.slice(0, 30).map(img => {
+      // Future compression logic can go here
       return img;
     });
   };

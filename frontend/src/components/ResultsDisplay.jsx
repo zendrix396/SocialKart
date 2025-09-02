@@ -1,119 +1,77 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FiEdit2, FiAlertCircle, FiCheckCircle } from 'react-icons/fi';
-import { storage, StorageKeys } from '../utils/storage';
+import { Link } from 'react-router-dom';
 
-function ResultsDisplay({ data, requestId }) {
-  const navigate = useNavigate();
-
-  const handleProceed = () => {
-    try {
-      storage.set(StorageKeys.LISTING_CONTENT, {
-        structured_content: data.structured_content,
-        raw_content: data.raw_content,
-        requestId: requestId
-      });
-      
-      storage.set(StorageKeys.LISTING_IMAGES, data.images);
-      navigate(`/edit/${requestId}`);
-    } catch (error) {
-      console.error('Error storing data:', error);
-      alert('Error storing data. Please try again.');
-    }
-  };
-
+function ResultsDisplay({ data, backendUrl }) {
   if (!data) {
     return null;
   }
-
+  
   if (data.error) {
     return (
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mt-8 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center shadow-sm"
-      >
-        <FiAlertCircle className="text-red-500 text-xl mr-3 flex-shrink-0" />
-        <span className="text-red-600">Error: {data.error}</span>
-      </motion.div>
+      <div className="mt-8 p-4 bg-red-100 text-red-700 rounded-lg">
+        <p className="font-bold">An error occurred:</p>
+        <p>{data.error}</p>
+      </div>
     );
   }
 
+  const { structured_content = {}, images = [] } = data || {};
+  
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="mt-8"
+    <motion.div 
+      className="mt-8 space-y-6"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
     >
-      <div className="bg-white border border-gray-200 rounded-lg p-8 shadow-lg">
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          className="w-16 h-16 mx-auto mb-4 bg-green-100 rounded-full flex items-center justify-center"
-        >
-          <FiCheckCircle className="text-3xl text-green-500" />
-        </motion.div>
+      <h3 className="text-2xl font-bold text-gray-800">Generated Listing</h3>
+      
+      {/* Image Grid */}
+      <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-6 gap-4">
+        {images && images.map((imgSrc, index) => (
+          <motion.div
+            key={index}
+            className="rounded-lg overflow-hidden shadow-lg"
+            whileHover={{ scale: 1.05 }}
+          >
+            <img src={`${backendUrl}${imgSrc}`} alt={`Product ${index + 1}`} className="w-full h-full object-cover"/>
+          </motion.div>
+        ))}
+      </div>
 
-        <h3 className="text-2xl font-semibold text-gray-800 mb-3">
-          Content Generated Successfully!
-        </h3>
+      {/* Structured Content */}
+      <div className="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+        <h4 className="text-xl font-semibold mb-2">{structured_content.product_name || 'Untitled Product'}</h4>
+        <p className="text-gray-600 mb-4">{structured_content.description || ''}</p>
         
-        <p className="text-gray-600 mb-6">
-          Your Amazon listing content is ready for editing and customization.
-          Click below to proceed to the editor.
-        </p>
-
-        <motion.button
-          onClick={handleProceed}
-          className="flex items-center justify-center space-x-2 mx-auto px-8 py-3 
-                     bg-gradient-to-r from-blue-500 to-blue-600 
-                     hover:from-blue-600 hover:to-blue-700
-                     rounded-lg text-white font-medium 
-                     transition-all duration-200
-                     shadow-md hover:shadow-lg"
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-        >
-          <FiEdit2 className="text-xl" />
-          <span>Proceed to Edit Listing</span>
-        </motion.button>
-
-        <div className="mt-6 text-sm text-gray-500 text-center">
-          You can customize all aspects of your listing in the next step
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <h5 className="font-semibold text-gray-700">Key Features:</h5>
+            <ul className="list-disc list-inside text-gray-600">
+              {structured_content.key_features && structured_content.key_features.map((feature, index) => (
+                <li key={index}>{feature}</li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <h5 className="font-semibold text-gray-700">SEO Keywords:</h5>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {structured_content.seo_keywords && structured_content.seo_keywords.map((keyword, index) => (
+                <span key={index} className="bg-blue-100 text-blue-800 text-sm font-medium px-2.5 py-0.5 rounded-full">
+                  {keyword}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
-
-      {/* Optional: Additional Information Cards */}
-      <div className="grid grid-cols-2 gap-4 mt-6">
-        <motion.div 
-          className="p-4 bg-blue-50 rounded-lg border border-blue-100"
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <h4 className="font-medium text-blue-800 mb-2">Next Steps</h4>
-          <ul className="text-sm text-blue-600 space-y-1">
-            <li>• Review product details</li>
-            <li>• Customize descriptions</li>
-            <li>• Select product images</li>
-          </ul>
-        </motion.div>
-
-        <motion.div 
-          className="p-4 bg-purple-50 rounded-lg border border-purple-100"
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          <h4 className="font-medium text-purple-800 mb-2">Available Features</h4>
-          <ul className="text-sm text-purple-600 space-y-1">
-            <li>• Rich text editor</li>
-            <li>• Image management</li>
-            <li>• Preview functionality</li>
-          </ul>
-        </motion.div>
-      </div>
+      
+      <Link 
+        to={`/edit/${btoa(JSON.stringify(data))}`}
+        className="block w-full text-center bg-green-500 text-white font-bold py-3 px-6 rounded-lg hover:bg-green-600 transition-colors"
+      >
+        Edit & Refine Listing
+      </Link>
     </motion.div>
   );
 }

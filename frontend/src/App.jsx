@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   BrowserRouter,
   Routes,
@@ -20,10 +20,15 @@ import {
   FiHome,
   FiInfo,
   FiUser,
+  FiTrash2,
 } from "react-icons/fi";
 import { ListingProvider } from "./context/ListingContext";
 import { BiTransfer } from "react-icons/bi";
 import "./App.css";
+import io from "socket.io-client";
+
+const socket = io("http://localhost:5000");
+
 function Navbar() {
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
@@ -147,7 +152,7 @@ function Navbar() {
     </nav>
   );
 }
-function Home({ handleProcess, loading, progress, results, requestId }) {
+function Home({ handleProcess, loading, progress, progressText, results, handleClear }) {
   return (
     <div className="space-y-8">
       <motion.div
@@ -166,7 +171,7 @@ function Home({ handleProcess, loading, progress, results, requestId }) {
       </motion.div>
 
       <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-200">
-        <InstagramForm onSubmit={handleProcess} />
+        <InstagramForm onSubmit={handleProcess} disabled={loading} />
 
         {loading && (
           <motion.div
@@ -174,8 +179,8 @@ function Home({ handleProcess, loading, progress, results, requestId }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
           >
-            <p className="text-gray-600 mb-4">{progress.current_step}</p>
-            <ProgressBar progress={progress.progress} />
+            <p className="text-gray-600 mb-4">{progressText}</p>
+            <ProgressBar progress={progress} />
           </motion.div>
         )}
 
@@ -185,7 +190,18 @@ function Home({ handleProcess, loading, progress, results, requestId }) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
           >
-            <ResultsDisplay data={results} requestId={requestId} />
+            <div className="flex justify-between items-center mb-4">
+                <h3 className="text-2xl font-bold text-gray-800">Generated Listing</h3>
+                <button 
+                    onClick={handleClear}
+                    className="p-2 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
+                    title="Clear results and local data"
+                >
+                    <FiTrash2 className="w-5 h-5" />
+                </button>
+            </div>
+            {/* Pass the backend URL to ResultsDisplay */}
+            <ResultsDisplay data={results} backendUrl="http://localhost:5000" />
           </motion.div>
         )}
       </div>
@@ -271,152 +287,148 @@ function Home({ handleProcess, loading, progress, results, requestId }) {
 function AppContent() {
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [requestId, setRequestId] = useState(null);
-  const [progress, setProgress] = useState({
-    current_step: "",
-    progress: 0,
-    error: null,
-  });
-  useEffect(() => {
-    const handleBeforeUnload = async () => {
-      try {
-        // Reset all states first
+  const [progress, setProgress] = useState(0);
+  const [progressText, setProgressText] = useState("");
+  const cleanupTimerRef = useRef(null);
+
+  const handleClear = async (idToClear) => {
+    const lastRequestId = idToClear || localStorage.getItem('lastRequestId');
+    if (!lastRequestId) {
         setResults(null);
-        setLoading(false);
-        setRequestId(null);
-        setProgress({
-          current_step: "",
-          progress: 0,
-          error: null,
-        });
-
-        // Then attempt cleanup
-        await fetch("http://localhost:5000/cleanup", {
-          method: "POST",
-          keepalive: true, // This ensures the request completes even if page is unloading
-        });
-      } catch (error) {
-        console.error("Cleanup error:", error);
-      }
-    };
-
-    window.addEventListener("beforeunload", handleBeforeUnload);
-
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-    };
-  }, []);
-  useEffect(() => {
-    let interval = null;
-    if (requestId && loading) {
-      interval = setInterval(async () => {
-        try {
-          const progressResponse = await fetch(
-            `http://localhost:5000/progress/${requestId}`
-          );
-          const progressData = await progressResponse.json();
-
-          if (progressData.error) {
-            setProgress({ ...progressData, error: progressData.error });
-            setLoading(false);
-            clearInterval(interval);
-          } else {
-            setProgress(progressData);
-
-            // Check if processing is complete
-            if (progressData.progress === 100 && progressData.result_ready) {
-              try {
-                const resultResponse = await fetch(
-                  `http://localhost:5000/result/${requestId}`
-                );
-
-                if (!resultResponse.ok) {
-                  throw new Error(
-                    `HTTP error! status: ${resultResponse.status}`
-                  );
-                }
-
-                const resultText = await resultResponse.text(); // Get raw text first
-                console.log("Raw response:", resultText); // Debug log
-
-                try {
-                  const resultData = JSON.parse(resultText);
-                  console.log("Parsed result data:", resultData);
-
-                  if (resultData.error) {
-                    throw new Error(resultData.error);
-                  }
-
-                  setResults(resultData);
-                  setLoading(false);
-                  clearInterval(interval);
-                } catch (parseError) {
-                  console.error("JSON parse error:", parseError);
-                  throw new Error("Invalid JSON response from server");
-                }
-              } catch (fetchError) {
-                console.error("Error fetching result:", fetchError);
-                setResults({ error: fetchError.message });
-                setLoading(false);
-                clearInterval(interval);
-              }
-            }
-          }
-        } catch (error) {
-          console.error("Error in progress check:", error);
-          setLoading(false);
-          clearInterval(interval);
-        }
-      }, 1000);
+        return;
     }
-
-    return () => {
-      if (interval) {
-        clearInterval(interval);
-      }
-    };
-  }, [requestId, loading]); // Added loading to dependencies
-
-  const handleProcess = async (submission) => {
-    setLoading(true);
-    setResults(null);
-    setProgress({
-      current_step: "Initializing...",
-      progress: 0,
-      error: null,
-    });
 
     try {
-      const endpoint =
-        submission.type === "url" ? "/process" : "/process_product";
-      const payload =
-        submission.type === "url"
-          ? { url: submission.data }
-          : { product_name: submission.data };
-
-      const response = await fetch(`http://localhost:5000${endpoint}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json();
-      if (response.ok) {
-        setRequestId(data.request_id);
-      } else {
-        setResults({ error: data.error });
-        setLoading(false);
-      }
+        await fetch(`http://localhost:5000/cleanup/${lastRequestId}`, { method: 'POST' });
     } catch (error) {
-      setResults({ error: "An error occurred while processing the request." });
-      setLoading(false);
+        console.error("Failed to call cleanup endpoint:", error);
+    } finally {
+        localStorage.removeItem('lastRequestId');
+        localStorage.removeItem('expirationTimestamp');
+        setResults(null);
     }
   };
+
+  const scheduleCleanup = (requestId, expirationTimestamp) => {
+    clearTimeout(cleanupTimerRef.current); // Clear any existing timer
+
+    const expirationTime = new Date(expirationTimestamp).getTime();
+    const now = new Date().getTime();
+    const delay = expirationTime - now;
+
+    if (delay > 0) {
+      console.log(`Scheduling cleanup for ${requestId} in ${delay / 1000} seconds.`);
+      cleanupTimerRef.current = setTimeout(() => {
+        console.log(`Auto-cleaning up ${requestId} as its 10-minute timer has expired.`);
+        handleClear(requestId);
+      }, delay);
+    } else {
+      // If expired, clean up immediately
+      console.log(`Data for ${requestId} has already expired. Cleaning up now.`);
+      handleClear(requestId);
+    }
+  };
+
+  useEffect(() => {
+    // On initial load, wipe local app state and ask backend to cleanup temp files
+    try {
+      localStorage.removeItem('lastRequestId');
+      localStorage.removeItem('expirationTimestamp');
+    } catch (e) {
+      console.warn('Failed to clear localStorage keys on load:', e);
+    }
+
+    fetch('http://localhost:5000/cleanup_all', { method: 'POST' }).catch(err => {
+      console.warn('cleanup_all request failed:', err);
+    });
+
+    // After cleanup, check for stored data (should be none, but keep logic safe)
+    const lastRequestId = localStorage.getItem('lastRequestId');
+    const expirationTimestamp = localStorage.getItem('expirationTimestamp');
+
+    if (lastRequestId && expirationTimestamp) {
+      if (new Date().getTime() > new Date(expirationTimestamp).getTime()) {
+        console.log(`Previous session for ${lastRequestId} has expired. Cleaning up.`);
+        handleClear(lastRequestId);
+      } else {
+        console.log(`Found last request ID: ${lastRequestId}. Fetching results...`);
+        setLoading(true);
+        fetch(`http://localhost:5000/results/${lastRequestId}`)
+          .then(res => {
+            if (!res.ok) throw new Error('Failed to fetch results');
+            return res.json();
+          })
+          .then(json => {
+            if (!json.error) {
+              setResults(json);
+              scheduleCleanup(lastRequestId, expirationTimestamp); // Schedule cleanup for existing session
+            } else {
+              setResults({ error: json.error });
+            }
+          })
+          .catch(error => {
+            console.error("Failed to fetch results:", error);
+            setResults({ error: "Failed to fetch results from server." });
+            setLoading(false);
+          });
+      }
+    }
+
+    // WebSocket event listeners
+    socket.on('connect', () => {
+        console.log('Connected to WebSocket server!');
+    });
+
+    socket.on('progress', (data) => {
+        setProgressText(data.data);
+        setProgress(data.progress);
+    });
+
+    socket.on('result', (data) => {
+        setResults(data);
+        setProgress(100);
+        setProgressText("Completed!");
+        setLoading(false);
+        if (data.request_id && data.expiration_timestamp) {
+            localStorage.setItem('lastRequestId', data.request_id);
+            localStorage.setItem('expirationTimestamp', data.expiration_timestamp);
+            scheduleCleanup(data.request_id, data.expiration_timestamp);
+        }
+    });
+
+    socket.on('error', (data) => {
+        setResults({ error: data.error });
+        setLoading(false);
+        setProgress(0);
+    });
+
+    return () => {
+        socket.off('connect');
+        socket.off('progress');
+        socket.off('result');
+        socket.off('error');
+        clearTimeout(cleanupTimerRef.current); // Clean up timer on component unmount
+    };
+  }, []);
+
+  const handleProcess = async (submission) => {
+    clearTimeout(cleanupTimerRef.current);
+    setLoading(true);
+    setResults(null);
+    localStorage.removeItem('lastRequestId');
+    localStorage.removeItem('expirationTimestamp');
+    setProgress(0);
+    setProgressText("Initializing...");
+    
+    socket.emit('start_processing', { url: submission.data });
+  };
+  
+  // Update handleClear to not need an argument by default
+  const clearCurrentResults = () => handleClear();
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
-
       <main className="max-w-7xl mx-auto px-4 py-8">
         <AnimatePresence mode="wait">
           <Routes>
@@ -427,8 +439,9 @@ function AppContent() {
                   handleProcess={handleProcess}
                   loading={loading}
                   progress={progress}
+                  progressText={progressText}
                   results={results}
-                  requestId={requestId}
+                  handleClear={clearCurrentResults}
                 />
               }
             />
@@ -441,7 +454,17 @@ function AppContent() {
 
       <footer className="bg-white border-t border-gray-200 py-8 mt-12">
         <div className="max-w-7xl mx-auto px-4 text-center">
-          <p className="text-gray-600">Made with ❤️ by LegionVanguard</p>
+          <p className="text-gray-600">
+            Made with ❤️ by{" "}
+            <a
+              href="https://github.com/zendrix396"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:underline"
+            >
+              Aditya
+            </a>
+          </p>
         </div>
       </footer>
     </div>
