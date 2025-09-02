@@ -1,121 +1,128 @@
-import requests
 import os
-import threading
-import time
-from pathlib import Path
+import json
+import base64
+from google import genai
+from google.genai import types
+from dotenv import load_dotenv
+from PIL import Image
+import io
 
-def parse_content(shortcode, posts_dir):
-    def read_file_safe(file_path):
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                return f.read()
-        except UnicodeDecodeError:
+load_dotenv()
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+def parse_content(shortcode, request_dir):
+    caption = ""
+    caption_path = os.path.join(request_dir, "caption.txt")
+    if os.path.exists(caption_path):
+        with open(caption_path, 'r', encoding='utf-8') as f:
+            caption = f.read()
+
+    transcript = ""
+    transcript_path = os.path.join(request_dir, "transcript.txt")
+    if os.path.exists(transcript_path):
+        with open(transcript_path, 'r', encoding='utf-8') as f:
+            transcript = f.read()
+    
+    image_parts = []
+    final_images_dir = os.path.join(request_dir, "relevant_final")
+    if os.path.exists(final_images_dir):
+        image_files = sorted([f for f in os.listdir(final_images_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))])
+        for image_file in image_files:
+            image_path = os.path.join(final_images_dir, image_file)
             try:
-                with open(file_path, 'r', encoding='latin-1') as f:
-                    return f.read()
-            except:
-                return None
-        except FileNotFoundError:
-            return None
+                with Image.open(image_path) as img:
+                    img = img.convert("RGB")
+                    img_buffer = io.BytesIO()
+                    img.save(img_buffer, format='PNG')
+                    img_bytes = img_buffer.getvalue()
+                    image_part = types.Part.from_bytes(
+                        mime_type="image/png",
+                        data=img_bytes
+                    )
+                    image_parts.append(image_part)
+            except Exception:
+                continue
+    
+    try:
+        client = genai.Client(api_key=GEMINI_API_KEY)
 
-    post_dir = Path(posts_dir) / f'post_{shortcode}'
-    caption = read_file_safe(post_dir / 'caption.txt') or 'No Instagram caption found.'
-    transcription = read_file_safe(post_dir / 'captions.txt') or 'No transcribed text found.'
+        prompt_text = f"""You are an expert e-commerce and marketing assistant. Your task is to analyze the content of a social media post (caption, transcript, and images) and generate a structured, comprehensive product listing in JSON format.
 
-    prompt = f"""[JUST RESPOND WITH THE LISTING DONT TALK TO ME, JUST HAVE LISTING IN YOUR RESPONSE] As an Amazon listing expert, create a compliant product listing from this social media content that meets Amazon's quality standards:
-From this raw Information Below
-[{caption}, {transcription}]
+Return ONLY the JSON object, with no markdown formatting or any other text outside the JSON.
 
-Generate a structured listing with EXACTLY [JUST KEEP THE ONE WHERE YOU ARE NOT SURE AS PLACEHOLDERS]:
+**Your primary goal is to create a schema that is highly relevant to the product being advertised.** Do NOT use generic placeholders like "Brand", "Dimensions", "Material", etc., unless they are directly applicable.
 
-1. Product Title (max 200 characters)
-- Format: [Brand] + [Model] + [Product Type] + [Key Feature]
-- Example: "ArjunWellness Pro-X Smart Fitness Tracker with Heart Rate Monitor"
-have a "----------" (10 bar lines) after giving it
-2. Five (5) Key Features (bullet points) [have the features starting with '-']
-- Start each with a benefit
-- No promotional language
-- Factual, specific details only
-have a "----------" (10 bar lines) after giving it
-3. Product Description
-- No HTML tags
-- No promotional claims
-- Structured in clear paragraphs
-- Focus on technical specifications
-- Avoid subjective statements
-have a "----------" (10 bar lines) after giving it
-4. Technical Details (as key-value pairs) [if the product is Technical, rest adjust accordingly] [have each detail bulletpoint starting with '-']
-- Brand:
-- Model:
-- Dimensions:
-- Weight:
-- Battery Life:
-- Connectivity:
-- Compatibility:
-- Warranty:
-have a "----------" (10 bar lines) after giving it
-5. Search Terms (5 relevant keywords) [have each starting with '-']
-- No brand names
-- No subjective terms
-- No competitor references
-Ensure all content:
-- Contains no medical claims
-- Follows Amazon's restricted keywords policy
-- Uses factual, verifiable information only
-- Complies with category-specific requirements
-- Maintains professional language
+**Core Schema Requirements (Always Include):**
+- "product_name": A clear, descriptive, and marketable name for the product or service.
+- "description": A detailed and compelling product description that highlights key benefits and features.
+- "key_features": An array of strings listing the most important selling points.
+- "target_audience": A string describing the primary customer segment.
+- "seo_keywords": An array of 5-10 relevant keywords for search engine optimization.
 
-Ensure to give the content in a way that this script can run and manage information given by you, just respond with the information no talking with me
-def parse_claude_response(content):
-    sections = content.split('----------')
-    return [
-        'title': sections[0].strip(),
-        'key_features': [
-            feature.strip() for feature in sections[1].strip().split('\n') 
-            if feature.strip() and not feature.strip().startswith('-')
-        ],
-        'description': sections[2].strip(),
-        'technical_details': [
-            line.split(':')[0].strip(): line.split(':')[1].strip()
-            for line in sections[3].strip().split('\n')
-            if ':' in line and not line.strip().startswith('-')
-        ],
-        'search_terms': [
-            term.strip() for term in sections[4].strip().split('\n')
-            if term.strip() and not term.strip().startswith('-')
-        ]
-    ]
+**Dynamic Schema Generation Instructions:**
+- Analyze the product type first and name the details object accordingly (e.g., "technical_details", "package_inclusions", "nutritional_info", "software_requirements").
+- Populate only relevant keys based on the provided content. Omit anything not present.
+
+Post Caption:
+{caption}
+
+Audio Transcript:
+{transcript}
 """
 
-    url = "http://127.0.0.1:8444/v1/chat/completions"
-    headers = {"Content-Type": "application/json"}
-    
-    messages = [
-        {"role": "system", "content": "You are an expert at creating professional Amazon product listings. Convert social media content into detailed, well-structured product listings."},
-        {"role": "user", "content": prompt}
-    ]
-    
-    data = {
-        "model": "claude-3-5-sonnet-20241022",
-        "messages": messages,
-        "max_tokens": 1024,
-        "stream": False
-    }
+        content_parts = []
+        for img in image_parts:
+            content_parts.append(img)
+        content_parts.append(types.Part.from_text(text=prompt_text))
 
-    try:
-        if not hasattr(parse_content, 'claude_started'):
-            threading.Thread(target=lambda: os.system("node clewd.js"), daemon=True).start()
-            time.sleep(3)  
-            parse_content.claude_started = True
+        contents = [types.Content(role="user", parts=content_parts)]
 
-        response = requests.post(url, headers=headers, json=data)
+        generate_content_config = types.GenerateContentConfig()
+
+        full_response = ""
+        for chunk in client.models.generate_content_stream(
+            model="gemini-2.0-flash",
+            contents=contents,
+            config=generate_content_config,
+        ):
+            if chunk.text:
+                full_response += chunk.text
         
-        if response.status_code == 200:
-            result = response.json()
-            generated_listing = result['choices'][0]['message']['content']
-            return generated_listing
-        else:
-            return f"Error generating listing: {response.status_code} - {response.text}"
+        generated_text = full_response.strip()
+        if generated_text.startswith("```json"):
+            generated_text = generated_text[7:]
+        if generated_text.endswith("```"):
+            generated_text = generated_text[:-3]
+        generated_text = generated_text.strip()
+
+        try:
+            parsed_json = json.loads(generated_text)
+            return parsed_json
+        except json.JSONDecodeError:
+            # Best-effort recovery: try to locate the first and last braces
+            start = generated_text.find("{")
+            end = generated_text.rfind("}")
+            if start != -1 and end != -1 and end > start:
+                try:
+                    return json.loads(generated_text[start:end+1])
+                except Exception:
+                    pass
+            # Fallback minimal structure
+            return {
+                "product_name": "Generated Listing",
+                "description": caption or transcript,
+                "key_features": [],
+                "target_audience": "",
+                "seo_keywords": []
+            }
 
     except Exception as e:
-        return f"Error processing request: {str(e)}"
+        return {"error": "Failed to generate content", "details": str(e)}
+
+if __name__ == '__main__':
+    # Test with a specific shortcode
+    test_shortcode = "DNSNq6bR635"  # Replace with actual shortcode for testing
+    result = parse_content(test_shortcode)
+    print("\n--- Generated Content ---")
+    print(result)
