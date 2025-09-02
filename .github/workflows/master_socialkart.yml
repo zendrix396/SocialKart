@@ -30,7 +30,8 @@ jobs:
           source venv/bin/activate
       
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        # --- CHANGE 1: Specify the path to requirements.txt within the 'backend' folder ---
+        run: pip install -r backend/requirements.txt
         
       # Optional: Add step to run tests here (PyTest, Django test suites, etc.)
 
@@ -38,9 +39,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: python-app
-          path: |
-            .
-            !venv/
+          # --- CHANGE 2: Specify that ONLY the 'backend' directory should be uploaded as the artifact ---
+          # This ensures that when the artifact is deployed, 'app.py' and 'requirements.txt' are at the root
+          # of the deployed content on Azure.
+          path: backend/
 
   deploy:
     runs-on: ubuntu-latest
@@ -68,4 +70,5 @@ jobs:
         with:
           app-name: 'socialkart'
           slot-name: 'Production'
-          
+          # --- CHANGE 3: Specify that the deployed package is the current directory (which contains the backend content) ---
+          package: '.'
