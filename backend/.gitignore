@@ -4,8 +4,9 @@ logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-
+.sessions/
 # Developer
+temp_processing/
 *_dev.js
 *.dev.js
 

@@ -133,7 +133,9 @@ def _emit_cached_result(sid, shortcode):
     }, room=sid)
     socketio.sleep(0.05)
     return True
-
+@app.route('/')
+def index():
+    return "API is running!"
 
 @app.route('/image/<request_id>/<filename>')
 def get_image(request_id, filename):
@@ -262,11 +264,13 @@ def update_session():
 
 def process_instagram_post_sync(sid, shortcode, request_id, request_dir):
     try:
+        print(f"Starting processing for sid: {sid}, shortcode: {shortcode}")
         socketio.emit('progress', {'data': 'Downloading media and caption...', 'progress': 20}, room=sid)
         socketio.sleep(0.1)
         post_info = grab_post(shortcode, request_dir)
         if not post_info:
             raise Exception("Failed to get post information")
+        print(f"Post info retrieved: {post_info}")
 
         # Emit the freshly downloaded original caption as early as possible
         try:
@@ -287,14 +291,16 @@ def process_instagram_post_sync(sid, shortcode, request_id, request_dir):
             return
 
         if video_path:
+            print(f"Processing video: {video_path}")
             socketio.emit('progress', {'data': 'Separating frames from video...', 'progress': 40}, room=sid)
             socketio.sleep(0.1)
             frames_output_dir = os.path.join(request_dir, "frames")
             video_to_frames(video_path, frames_output_dir, shortcode)
+            print("Frame separation completed")
             # Notify frontend that frame separation has completed
             socketio.emit('progress', {'data': 'Frames separated successfully', 'progress': 50}, room=sid)
             socketio.sleep(0.1)
-            
+
             if sid in canceled_sids:
                 _cleanup_request_dir(request_dir)
                 return
@@ -302,6 +308,7 @@ def process_instagram_post_sync(sid, shortcode, request_id, request_dir):
             socketio.emit('progress', {'data': 'Classifying frames and selecting the best ones...', 'progress': 60}, room=sid)
             socketio.sleep(0.1)
             classify_and_move_images(shortcode, request_dir, frames_output_dir)
+            print("Frame classification completed")
             # Notify frontend that classification has completed
             socketio.emit('progress', {'data': 'Frame classification completed', 'progress': 70}, room=sid)
             socketio.sleep(0.1)
@@ -320,17 +327,22 @@ def process_instagram_post_sync(sid, shortcode, request_id, request_dir):
                 _cleanup_request_dir(request_dir)
                 return
 
+            print("Starting audio transcription")
             socketio.emit('progress', {'data': 'Extracting and transcribing audio...', 'progress': 80}, room=sid)
+            socketio.sleep(0.1)
             transcribe_video(video_path, request_dir)
+            print("Audio transcription completed")
         
         if sid in canceled_sids:
             _cleanup_request_dir(request_dir)
             return
 
+        print("Starting Gemini parsing")
         socketio.emit('progress', {'data': 'Generating final listing with AI...', 'progress': 95}, room=sid)
         socketio.sleep(0.1)
         try:
             parsed_content = parse_content(shortcode, request_dir)
+            print("Gemini parsing completed successfully")
         except Exception as e:
             print(f"Error in parse_content: {e}")
             # Create fallback content
@@ -347,6 +359,7 @@ def process_instagram_post_sync(sid, shortcode, request_id, request_dir):
             except Exception:
                 pass
             parsed_content = _placeholder_result(caption_text, transcript_text)
+            print("Using fallback content due to Gemini error")
         # Ensure caption.txt exists even if Instaloader changes behavior
         caption_path = os.path.join(request_dir, 'caption.txt')
         if not os.path.exists(caption_path):
@@ -371,6 +384,7 @@ def process_instagram_post_sync(sid, shortcode, request_id, request_dir):
 
         expiration_time = datetime.utcnow() + timedelta(seconds=DATA_TTL_SECONDS)
         
+        print(f"Emitting final result to sid: {sid}")
         socketio.emit('result', {
             'structured_content': parsed_content,
             'images': final_images,
@@ -380,6 +394,7 @@ def process_instagram_post_sync(sid, shortcode, request_id, request_dir):
         }, room=sid)
         
         socketio.sleep(0.1)
+        print(f"Processing completed successfully for sid: {sid}")
 
     except Exception as e:
         # Send placeholder result instead of raw error
@@ -454,4 +469,4 @@ def handle_disconnect():
 
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True)
+    socketio.run(app, host='0.0.0.0', debug=True)
