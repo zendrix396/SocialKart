@@ -466,3 +466,6 @@ def handle_disconnect():
     info = sid_to_request.pop(sid, None)
     if info:
         _cleanup_request_dir(info.get("request_dir"))
+
+if __name__ == '__main__':
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True)

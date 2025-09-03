@@ -5,8 +5,26 @@ from PIL import Image, ImageOps
 import numpy as np
 import re
 
-ort_session = onnxruntime.InferenceSession("model.onnx", providers=["CPUExecutionProvider"])
+
+# Initialize the session to None. It will be loaded on the first request.
+ort_session = None
 class_names = open("labels.txt", "r").readlines()
+
+def get_ort_session():
+    """
+    Lazily initializes and returns the ONNX runtime session.
+    This ensures the model is loaded only when first needed.
+    """
+    global ort_session
+    if ort_session is None:
+        print("Initializing ONNX session for the first time...")
+        # Ensure the model path is correct for the Azure environment
+        model_path = os.path.join(os.path.dirname(__file__), "model.onnx")
+        ort_session = onnxruntime.InferenceSession(model_path, providers=["CPUExecutionProvider"])
+        print("ONNX session initialized successfully.")
+    return ort_session
+
+# --- MODIFICATION END ---
 
 def get_frame_number(filename):
     match = re.search(r'frame_(\d+)', filename)
@@ -15,6 +33,9 @@ def get_frame_number(filename):
     return 0
 
 def classify_and_move_images(shortcode, request_dir, frames_dir):
+    # --- MODIFICATION: Call the function to get the session ---
+    session = get_ort_session()
+    
     input_frames_dir = os.path.join(frames_dir, f"output_frames_{shortcode}")
     
     relevant_dir = os.path.join(request_dir, "relevant")
@@ -34,7 +55,8 @@ def classify_and_move_images(shortcode, request_dir, frames_dir):
     if not images:
         return
 
-    input_name = ort_session.get_inputs()[0].name
+    # --- MODIFICATION: Use the lazily-loaded session ---
+    input_name = session.get_inputs()[0].name
     
     all_frames_with_scores = []
 
@@ -53,7 +75,8 @@ def classify_and_move_images(shortcode, request_dir, frames_dir):
             continue
         
         ort_inputs = {input_name: data}
-        ort_outs = ort_session.run(None, ort_inputs)
+        # --- MODIFICATION: Use the lazily-loaded session ---
+        ort_outs = session.run(None, ort_inputs)
         prediction = ort_outs[0]
 
         relevant_score = prediction[0][0]
@@ -65,7 +88,8 @@ def classify_and_move_images(shortcode, request_dir, frames_dir):
         })
 
     all_frames_with_scores.sort(key=lambda x: x['score'], reverse=True)
-
+    
+    # ... the rest of the function remains the same ...
     selected_frames = []
     selected_frame_numbers = []
     FRAME_DIFFERENCE_THRESHOLD = 60
@@ -84,7 +108,6 @@ def classify_and_move_images(shortcode, request_dir, frames_dir):
             selected_frames.append(frame_info)
             selected_frame_numbers.append(frame_info["frame_number"])
 
-    # If spacing filter produced fewer than 30, top-up with next best distinct frames
     if len(selected_frames) < 30:
         for frame_info in all_frames_with_scores:
             if len(selected_frames) >= 30:
