@@ -84,6 +84,22 @@ def classify_and_move_images(shortcode, request_dir, frames_dir):
             selected_frames.append(frame_info)
             selected_frame_numbers.append(frame_info["frame_number"])
 
+    # If spacing filter produced fewer than 30, top-up with next best distinct frames
+    if len(selected_frames) < 30:
+        for frame_info in all_frames_with_scores:
+            if len(selected_frames) >= 30:
+                break
+            if frame_info in selected_frames:
+                continue
+            is_far_enough = True
+            for selected_num in selected_frame_numbers:
+                if abs(frame_info["frame_number"] - selected_num) < FRAME_DIFFERENCE_THRESHOLD:
+                    is_far_enough = False
+                    break
+            if is_far_enough:
+                selected_frames.append(frame_info)
+                selected_frame_numbers.append(frame_info["frame_number"])
+
     for frame_info in selected_frames:
         src_path = os.path.join(input_frames_dir, frame_info['filename'])
         dest_path = os.path.join(final_relevant_dir, frame_info['filename'])

@@ -95,6 +95,24 @@ function ListingPreview() {
     );
   }
 
+  const mergedDetails = (() => {
+    const d = content.details || content.technical_details || {};
+    // Only include stringifiable primitives for display
+    const out = {};
+    Object.entries(d).forEach(([k, v]) => {
+      if (v === null || v === undefined) return;
+      if (typeof v === 'object') {
+        try { out[k] = JSON.stringify(v); } catch { /* ignore */ }
+      } else {
+        out[k] = String(v);
+      }
+    });
+    return out;
+  })();
+
+  const schema = content.technical_details_schema || {};
+  const schemaProps = schema.properties || {};
+
   return (
     <div className="min-h-screen bg-white">
       {/* Navigation Bar */}
@@ -257,7 +275,7 @@ function ListingPreview() {
             </h2>
             <table className="w-full">
               <tbody>
-                {Object.entries(content.technical_details || {}).map(
+                {Object.entries(mergedDetails).map(
                   ([key, value]) => (
                     <tr key={key} className="border-b border-gray-200">
                       <td className="py-2 font-medium text-gray-600">{key}</td>
@@ -268,6 +286,25 @@ function ListingPreview() {
               </tbody>
             </table>
           </div>
+
+          {/* Technical Details Schema (optional) */}
+          {Object.keys(schemaProps).length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-lg font-medium mb-2 text-gray-700">
+                Specifications Schema {schema.category ? `(Category: ${schema.category})` : ''}
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {Object.entries(schemaProps).map(([name, meta]) => (
+                  <div key={name} className="p-3 border rounded-lg bg-gray-50">
+                    <div className="text-gray-800 font-semibold">{name}{meta?.type ? ` (${meta.type})` : ''}</div>
+                    {meta?.description && (
+                      <div className="text-gray-600 text-sm mt-1">{meta.description}</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Search Terms */}
           <div className="mb-6">

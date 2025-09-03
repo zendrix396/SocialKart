@@ -47,29 +47,43 @@ def parse_content(shortcode, request_dir):
     try:
         client = genai.Client(api_key=GEMINI_API_KEY)
 
-        prompt_text = f"""You are an expert e-commerce and marketing assistant. Your task is to analyze the content of a social media post (caption, transcript, and images) and generate a structured, comprehensive product listing in JSON format.
+        static_instructions = """
+You are an expert e-commerce and marketing assistant. Analyze the caption, audio transcript, and images of a social media post and return a comprehensive product listing as pure JSON.
 
-Return ONLY the JSON object, with no markdown formatting or any other text outside the JSON.
+Return ONLY the JSON object, with no markdown or extra text.
 
-**Your primary goal is to create a schema that is highly relevant to the product being advertised.** Do NOT use generic placeholders like "Brand", "Dimensions", "Material", etc., unless they are directly applicable.
+Required top-level keys (always present):
+- product_name: Clear, marketable product or service name.
+- description: Detailed, compelling description with concrete details if available.
+- key_features: Array of concise bullet points highlighting benefits.
+- target_audience: Who this offering is for.
+- seo_keywords: 5-10 relevant search keywords.
+- technical_details: An object of concrete attributes. This object MUST NOT be empty.
+- technical_details_schema: An object describing the structure of technical_details with a "properties" object. This MUST include property names with descriptions and, when applicable, nominal types (string, number, boolean, array, object). Example shape:
+  {
+    "category": "jewelry",
+    "properties": {
+      "material": {"type": "string", "description": "Metal type/purity"},
+      "gemstone": {"type": "string", "description": "Type/shape/carat/clarity if visible"},
+      "dimensions": {"type": "string", "description": "Size/length/width/height where applicable"}
+    }
+  }
 
-**Core Schema Requirements (Always Include):**
-- "product_name": A clear, descriptive, and marketable name for the product or service.
-- "description": A detailed and compelling product description that highlights key benefits and features.
-- "key_features": An array of strings listing the most important selling points.
-- "target_audience": A string describing the primary customer segment.
-- "seo_keywords": An array of 5-10 relevant keywords for search engine optimization.
+Rules for technical_details and schema:
+- First infer the category (e.g., travel package, jewelry, apparel, electronics, cosmetics, home decor, software/service, food/beverage, fitness, education, real estate, automotive, etc.) and include it in technical_details_schema.category.
+- Fill technical_details with concrete specs from caption/transcript/images. Prefer measurable attributes (dimensions, weight, capacity, size, material, color, finish, gemstone type/carat/clarity, metal purity, warranty, duration, accommodation class, itinerary, OS/version, compatibility, ingredients, SPF/PA rating, battery life, refresh rate, storage/RAM, etc.).
+- If exact numbers are unavailable but attributes are visually implied, include descriptive values without fabricating exact numbers (e.g., "yellow gold finish", "round-cut stone", "compact form factor").
+- Ensure every key in technical_details has a corresponding entry in technical_details_schema.properties with type and description.
 
-**Dynamic Schema Generation Instructions:**
-- Analyze the product type first and name the details object accordingly (e.g., "technical_details", "package_inclusions", "nutritional_info", "software_requirements").
-- Populate only relevant keys based on the provided content. Omit anything not present.
-
-Post Caption:
-{caption}
-
-Audio Transcript:
-{transcript}
+Image-derived cues (when visible):
+- Extract visible labels, packaging sizes, display sizes, form factor, ports, connectors, patterns, gemstone shapes/cuts, clasp types, ring size guides, etc.
 """
+
+        prompt_text = (
+            static_instructions
+            + "\n\nPost Caption:\n" + (caption or "")
+            + "\n\nAudio Transcript:\n" + (transcript or "")
+        )
 
         content_parts = []
         for img in image_parts:
@@ -114,7 +128,9 @@ Audio Transcript:
                 "description": caption or transcript,
                 "key_features": [],
                 "target_audience": "",
-                "seo_keywords": []
+                "seo_keywords": [],
+                "technical_details": {},
+                "technical_details_schema": {"category": "", "properties": {}}
             }
 
     except Exception as e:

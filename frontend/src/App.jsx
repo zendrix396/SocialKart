@@ -12,6 +12,7 @@ import ResultsDisplay from "./components/ResultsDisplay";
 import ProgressBar from "./components/ProgressBar";
 import ListingEditor from "./components/ListingEditor";
 import ListingPreview from "./components/ListingPreview";
+import UpdateSession from "./components/UpdateSession";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FiInstagram,
@@ -74,10 +75,7 @@ function Navbar() {
               <FiInfo />
               <span>About</span>
             </Link>
-            <button className="flex items-center space-x-1 text-gray-600 hover:text-blue-600 transition-colors">
-              <FiUser />
-              <span>Login</span>
-            </button>
+           
           </div>
 
           {/* Mobile Hamburger Button */}
@@ -139,43 +137,104 @@ function Navbar() {
                 <span>About</span>
               </div>
             </Link>
-            <button
+            <Link
+              to="/update"
               onClick={() => setIsOpen(false)}
-              className="w-full text-left block px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+              className="block px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-blue-600 hover:bg-blue-50 transition-colors"
             >
               <div className="flex items-center space-x-2">
                 <FiUser />
-                <span>Login</span>
+                <span>Update Session</span>
               </div>
-            </button>
+            </Link>
           </div>
         </motion.div>
       </div>
     </nav>
   );
 }
-function Home({ handleProcess, loading, progress, progressText, results, handleClear }) {
+
+function ServiceStatusBanner() {
+  const [status, setStatus] = useState({ state: 'loading', cls: '', error: '' });
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchStatus = async () => {
+      try {
+        const res = await fetch('https://stats.uptimerobot.com/api/getMonitorList/viILyliSth?page=1');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+        const cls = json?.psp?.monitors?.[0]?.statusClass || '';
+        const lc = String(cls).toLowerCase();
+        let state = 'unknown';
+        if (lc.includes('green') || lc.includes('success')) state = 'success';
+        else if (lc.includes('red') || lc.includes('danger')) state = 'danger';
+        else if (lc.includes('yellow') || lc.includes('warn')) state = 'warn';
+        if (!cancelled) setStatus({ state, cls, error: '' });
+      } catch (e) {
+        if (!cancelled) setStatus({ state: 'error', cls: '', error: e?.message || 'Failed to fetch status' });
+      }
+    };
+    fetchStatus();
+    const id = setInterval(fetchStatus, 60000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
+
+  let container = 'bg-blue-50 border-blue-200';
+  let iconColor = 'text-blue-600';
+  let textColor = 'text-blue-700';
+  let label = 'Checking service status...';
+
+  if (status.state === 'success') {
+    container = 'bg-green-50 border-green-200';
+    iconColor = 'text-green-600';
+    textColor = 'text-green-700';
+    label = 'All services operational';
+  } else if (status.state === 'danger') {
+    container = 'bg-red-50 border-red-200';
+    iconColor = 'text-red-600';
+    textColor = 'text-red-700';
+    label = 'Service down right now';
+  } else if (status.state === 'warn') {
+    container = 'bg-yellow-50 border-yellow-200';
+    iconColor = 'text-yellow-600';
+    textColor = 'text-yellow-700';
+    label = 'Service may be experiencing issues';
+  } else if (status.state === 'error') {
+    container = 'bg-gray-50 border-gray-200';
+    iconColor = 'text-gray-600';
+    textColor = 'text-gray-700';
+    label = 'Unable to verify service status';
+  }
+
   return (
-    <div className="space-y-8">
-      {/* Service Status Banner */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg"
+      className={`${container} border-l-4 p-4 rounded-lg`}
       >
         <div className="flex">
           <div className="flex-shrink-0">
-            <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+          <svg className={`h-5 w-5 ${iconColor}`} viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
             </svg>
           </div>
           <div className="ml-3">
-            <p className="text-sm text-yellow-700 font-medium">
-              Service repl is temporarily down, run locally instead
+          <p className={`text-sm font-medium ${textColor}`}>
+            {label}
+            {status.cls ? ` (${status.cls})` : ''}
+            {status.state === 'error' && status.error ? ` — ${status.error}` : ''}
             </p>
           </div>
         </div>
       </motion.div>
+  );
+}
+function Home({ handleProcess, loading, progress, progressText, results, handleClear, caption }) {
+  return (
+    <div className="space-y-8">
+      {/* Service Status Banner */}
+      <ServiceStatusBanner />
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -203,6 +262,12 @@ function Home({ handleProcess, loading, progress, progressText, results, handleC
           >
             <p className="text-gray-600 mb-4">{progressText}</p>
             <ProgressBar progress={progress} />
+            {caption && (
+              <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">Original Caption</p>
+                <p className="text-gray-700 text-sm whitespace-pre-wrap">{caption}</p>
+              </div>
+            )}
           </motion.div>
         )}
 
@@ -312,6 +377,7 @@ function AppContent() {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [progressText, setProgressText] = useState("");
+  const [caption, setCaption] = useState("");
   const cleanupTimerRef = useRef(null);
 
   // Load backend URL from public/config.json and init socket
@@ -439,6 +505,12 @@ function AppContent() {
         setProgress(data.progress);
     });
 
+    socket.on('caption_update', (data) => {
+        if (data && typeof data.caption === 'string') {
+          setCaption(data.caption);
+        }
+    });
+
     socket.on('result', (data) => {
         const merged = { ...data, backendUrl };
         setResults(merged);
@@ -473,6 +545,7 @@ function AppContent() {
         socket.off('progress');
         socket.off('result');
         socket.off('error');
+        socket.off('caption_update');
         clearTimeout(cleanupTimerRef.current); // Clean up timer on component unmount
     };
   }, [backendUrl]);
@@ -510,11 +583,13 @@ function AppContent() {
                   progressText={progressText}
                   results={results}
                   handleClear={clearCurrentResults}
+                  caption={caption}
                 />
               }
             />
             <Route path="/edit/:requestId" element={<ListingEditor />} />
             <Route path="/preview/:requestId" element={<ListingPreview />} />
+            <Route path="/update" element={<UpdateSession backendUrl={backendUrl} />} />
             <Route path="/about" element={<About />} />
           </Routes>
         </AnimatePresence>

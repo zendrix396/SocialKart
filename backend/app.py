@@ -18,6 +18,7 @@ import uuid
 import json
 import threading
 from datetime import datetime, timedelta
+import video_caption_grabber as vcg
 
 
 app = Flask(__name__)
@@ -32,6 +33,10 @@ DATA_TTL_SECONDS = 600  # 10 minutes
 # Index file to map shortcode -> request_id for reuse
 INDEX_PATH = os.path.join(TEMP_PROCESSING_DIR, "index.json")
 os.makedirs(TEMP_PROCESSING_DIR, exist_ok=True)
+
+# Track active requests by WebSocket session and allow graceful cancellation/cleanup
+sid_to_request = {}
+canceled_sids = set()
 
 
 def _read_index():
@@ -68,6 +73,27 @@ def _remaining_ttl_seconds(request_dir):
     spent = now_ts - last_mtime
     remain = int(max(0, DATA_TTL_SECONDS - spent))
     return remain
+
+
+def _cleanup_request_dir(request_dir):
+    try:
+        if os.path.exists(request_dir):
+            shutil.rmtree(request_dir)
+    except Exception:
+        pass
+
+
+def _placeholder_result(caption_text, transcript_text):
+    base_desc = caption_text or transcript_text or ""
+    return {
+        "product_name": "Generated Listing",
+        "description": base_desc,
+        "key_features": [],
+        "target_audience": "",
+        "seo_keywords": [],
+        "technical_details": {},
+        "technical_details_schema": {"category": "", "properties": {}}
+    }
 
 
 def _emit_cached_result(sid, shortcode):
@@ -202,28 +228,125 @@ def cleanup_all():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/update', methods=['POST'])
+def update_session():
+    try:
+        payload = request.get_json(silent=True) or {}
+        session_id = payload.get('sessionId') or payload.get('sessionid') or payload.get('SESSIONID')
+        if not session_id:
+            return jsonify({"error": "Missing sessionId in body"}), 400
+        # Update the module-level variable used for cookie-based login
+        vcg.INSTAGRAM_SESSIONID = session_id
+        # Bust the cached Instaloader session so the next call re-initializes with new cookie
+        try:
+            vcg.get_instaloader_session.cache_clear()
+        except Exception:
+            pass
+        # Also persist the session id into the source file so it's visible and survives restarts
+        try:
+            vcg_path = os.path.join(os.path.dirname(__file__), 'video_caption_grabber.py')
+            with open(vcg_path, 'r', encoding='utf-8') as f:
+                src = f.read()
+            # Escape quotes in the cookie if any
+            safe_cookie = session_id.replace('"', '\\"')
+            new_src = re.sub(r'^INSTAGRAM_SESSIONID\s*=\s*".*?"', f'INSTAGRAM_SESSIONID = "{safe_cookie}"', src, count=1, flags=re.MULTILINE)
+            if new_src != src:
+                with open(vcg_path, 'w', encoding='utf-8') as f:
+                    f.write(new_src)
+        except Exception:
+            # Persistence is best-effort; runtime update already applied
+            pass
+        return jsonify({"message": "Session updated"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 def process_instagram_post_sync(sid, shortcode, request_id, request_dir):
     try:
         socketio.emit('progress', {'data': 'Downloading media and caption...', 'progress': 20}, room=sid)
+        socketio.sleep(0.1)
         post_info = grab_post(shortcode, request_dir)
         if not post_info:
             raise Exception("Failed to get post information")
 
+        # Emit the freshly downloaded original caption as early as possible
+        try:
+            caption_path_early = os.path.join(request_dir, 'caption.txt')
+            if os.path.exists(caption_path_early):
+                with open(caption_path_early, 'r', encoding='utf-8') as cf:
+                    early_caption = cf.read()
+                socketio.emit('caption_update', {'caption': early_caption}, room=sid)
+                socketio.sleep(0.01)
+        except Exception:
+            pass
+
         video_path = post_info.get('video_path')
+
+        # If client disconnected in between, stop early and cleanup
+        if sid in canceled_sids:
+            _cleanup_request_dir(request_dir)
+            return
 
         if video_path:
             socketio.emit('progress', {'data': 'Separating frames from video...', 'progress': 40}, room=sid)
+            socketio.sleep(0.1)
             frames_output_dir = os.path.join(request_dir, "frames")
             video_to_frames(video_path, frames_output_dir, shortcode)
+            # Notify frontend that frame separation has completed
+            socketio.emit('progress', {'data': 'Frames separated successfully', 'progress': 50}, room=sid)
+            socketio.sleep(0.1)
             
+            if sid in canceled_sids:
+                _cleanup_request_dir(request_dir)
+                return
+
             socketio.emit('progress', {'data': 'Classifying frames and selecting the best ones...', 'progress': 60}, room=sid)
+            socketio.sleep(0.1)
             classify_and_move_images(shortcode, request_dir, frames_output_dir)
+            # Notify frontend that classification has completed
+            socketio.emit('progress', {'data': 'Frame classification completed', 'progress': 70}, room=sid)
+            socketio.sleep(0.1)
+            # Optionally emit the original caption after classification so UI can show/update it
+            try:
+                caption_path = os.path.join(request_dir, 'caption.txt')
+                if os.path.exists(caption_path):
+                    with open(caption_path, 'r', encoding='utf-8') as cf:
+                        original_caption = cf.read()
+                    socketio.emit('caption_update', {'caption': original_caption}, room=sid)
+                    socketio.sleep(0.01)
+            except Exception:
+                pass
+
+            if sid in canceled_sids:
+                _cleanup_request_dir(request_dir)
+                return
 
             socketio.emit('progress', {'data': 'Extracting and transcribing audio...', 'progress': 80}, room=sid)
             transcribe_video(video_path, request_dir)
         
+        if sid in canceled_sids:
+            _cleanup_request_dir(request_dir)
+            return
+
         socketio.emit('progress', {'data': 'Generating final listing with AI...', 'progress': 95}, room=sid)
-        parsed_content = parse_content(shortcode, request_dir)
+        socketio.sleep(0.1)
+        try:
+            parsed_content = parse_content(shortcode, request_dir)
+        except Exception as e:
+            print(f"Error in parse_content: {e}")
+            # Create fallback content
+            caption_text = ""
+            try:
+                with open(os.path.join(request_dir, 'caption.txt'), 'r', encoding='utf-8') as cf:
+                    caption_text = cf.read()
+            except Exception:
+                pass
+            transcript_text = ""
+            try:
+                with open(os.path.join(request_dir, 'transcript.txt'), 'r', encoding='utf-8') as tf:
+                    transcript_text = tf.read()
+            except Exception:
+                pass
+            parsed_content = _placeholder_result(caption_text, transcript_text)
         # Ensure caption.txt exists even if Instaloader changes behavior
         caption_path = os.path.join(request_dir, 'caption.txt')
         if not os.path.exists(caption_path):
@@ -241,7 +364,10 @@ def process_instagram_post_sync(sid, shortcode, request_id, request_dir):
         idx[shortcode] = {"request_id": request_id, "ts": time.time()}
         _write_index(idx)
 
-        final_images = [f"/image/{request_id}/{f}" for f in sorted(os.listdir(os.path.join(request_dir, "relevant_final")))[:30]]
+        final_images_dir = os.path.join(request_dir, "relevant_final")
+        final_images = []
+        if os.path.exists(final_images_dir):
+            final_images = [f"/image/{request_id}/{f}" for f in sorted(os.listdir(final_images_dir))[:30]]
 
         expiration_time = datetime.utcnow() + timedelta(seconds=DATA_TTL_SECONDS)
         
@@ -256,9 +382,32 @@ def process_instagram_post_sync(sid, shortcode, request_id, request_dir):
         socketio.sleep(0.1)
 
     except Exception as e:
-        socketio.emit('error', {'error': str(e)}, room=sid)
-        if os.path.exists(request_dir):
-            shutil.rmtree(request_dir)
+        # Send placeholder result instead of raw error
+        try:
+            caption_text = ""
+            try:
+                with open(os.path.join(request_dir, 'caption.txt'), 'r', encoding='utf-8') as cf:
+                    caption_text = cf.read()
+            except Exception:
+                pass
+            transcript_text = ""
+            try:
+                with open(os.path.join(request_dir, 'transcript.txt'), 'r', encoding='utf-8') as tf:
+                    transcript_text = tf.read()
+            except Exception:
+                pass
+            expiration_time = datetime.utcnow() + timedelta(seconds=DATA_TTL_SECONDS)
+            socketio.emit('result', {
+                'structured_content': _placeholder_result(caption_text, transcript_text),
+                'images': [],
+                'request_id': request_id,
+                'expiration_timestamp': expiration_time.isoformat() + 'Z',
+                'expires_in_seconds': DATA_TTL_SECONDS
+            }, room=sid)
+        except Exception:
+            socketio.emit('error', {'error': str(e)}, room=sid)
+        finally:
+            _cleanup_request_dir(request_dir)
 
 @socketio.on('start_processing')
 def handle_start_processing(json_data):
@@ -280,8 +429,28 @@ def handle_start_processing(json_data):
     request_dir = os.path.join(TEMP_PROCESSING_DIR, request_id)
     os.makedirs(request_dir, exist_ok=True)
 
+    # Immediately notify frontend that processing has begun
+    try:
+        socketio.emit('progress', {'data': 'Processing started...', 'progress': 10}, room=sid)
+        socketio.sleep(0.05)
+    except Exception:
+        pass
+
+    # Register sid to request mapping; clear any previous canceled flag
+    canceled_sids.discard(sid)
+    sid_to_request[sid] = {"request_id": request_id, "request_dir": request_dir}
+
     # Offload the long-running task to a background thread
     socketio.start_background_task(process_instagram_post_sync, sid, shortcode, request_id, request_dir)
+
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    sid = request.sid
+    canceled_sids.add(sid)
+    info = sid_to_request.pop(sid, None)
+    if info:
+        _cleanup_request_dir(info.get("request_dir"))
 
 
 if __name__ == '__main__':
