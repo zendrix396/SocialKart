@@ -155,24 +155,21 @@ function Navbar() {
 }
 
 function ServiceStatusBanner() {
-  const [status, setStatus] = useState({ state: 'loading', cls: '', error: '' });
+  const [status, setStatus] = useState({ state: 'loading', error: '' });
 
   useEffect(() => {
     let cancelled = false;
     const fetchStatus = async () => {
       try {
-        const res = await fetch('https://stats.uptimerobot.com/api/getMonitorList/viILyliSth?page=1');
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json = await res.json();
-        const cls = json?.psp?.monitors?.[0]?.statusClass || '';
-        const lc = String(cls).toLowerCase();
-        let state = 'unknown';
-        if (lc.includes('green') || lc.includes('success')) state = 'success';
-        else if (lc.includes('red') || lc.includes('danger')) state = 'danger';
-        else if (lc.includes('yellow') || lc.includes('warn')) state = 'warn';
-        if (!cancelled) setStatus({ state, cls, error: '' });
+        const res = await fetch('https://socialkartapi.zendrix.dev', { 
+          method: 'HEAD',
+          mode: 'no-cors' // This allows the request to work even if CORS is not configured
+        });
+        // Since we're using no-cors mode, we can't check res.ok
+        // If the request doesn't throw an error, we assume the server is up
+        if (!cancelled) setStatus({ state: 'success', error: '' });
       } catch (e) {
-        if (!cancelled) setStatus({ state: 'error', cls: '', error: e?.message || 'Failed to fetch status' });
+        if (!cancelled) setStatus({ state: 'error', error: e?.message || 'Server unreachable' });
       }
     };
     fetchStatus();
@@ -189,22 +186,12 @@ function ServiceStatusBanner() {
     container = 'bg-green-50 border-green-200';
     iconColor = 'text-green-600';
     textColor = 'text-green-700';
-    label = 'All services operational';
-  } else if (status.state === 'danger') {
+    label = 'All systems operational';
+  } else if (status.state === 'error') {
     container = 'bg-red-50 border-red-200';
     iconColor = 'text-red-600';
     textColor = 'text-red-700';
-    label = 'Service down right now';
-  } else if (status.state === 'warn') {
-    container = 'bg-yellow-50 border-yellow-200';
-    iconColor = 'text-yellow-600';
-    textColor = 'text-yellow-700';
-    label = 'Service may be experiencing issues';
-  } else if (status.state === 'error') {
-    container = 'bg-gray-50 border-gray-200';
-    iconColor = 'text-gray-600';
-    textColor = 'text-gray-700';
-    label = 'Unable to verify service status';
+    label = 'Server down';
   }
 
   return (
@@ -222,8 +209,6 @@ function ServiceStatusBanner() {
           <div className="ml-3">
           <p className={`text-sm font-medium ${textColor}`}>
             {label}
-            {status.cls ? ` (${status.cls})` : ''}
-            {status.state === 'error' && status.error ? ` — ${status.error}` : ''}
             </p>
           </div>
         </div>
@@ -557,7 +542,7 @@ function AppContent() {
     localStorage.removeItem('lastRequestId');
     localStorage.removeItem('expirationTimestamp');
     setProgress(0);
-    setProgressText("Initializing...");
+    setProgressText("Initializing... (try again if it looks stuck for more than 15 seconds!)");
     
     if (socket) {
       socket.emit('start_processing', { url: submission.data });

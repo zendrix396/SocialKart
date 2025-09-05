@@ -4,6 +4,15 @@
 
 SocialKart is an AI-powered tool that automatically converts Instagram posts into professional product listings. It streamlines the e-commerce content creation process by extracting video frames, transcribing audio, and using AI to generate marketing copy.
 
+## Try Here
+
+**[socialkart.vercel.app](https://socialkart.vercel.app)**
+
+To use the app, go to `socialkart.vercel.app/update` and add your Instagram session ID:
+1. Open Chrome Dev Tools → Application tab → Find `sessionId` 
+2. Copy and paste it in the update section
+3. After testing, replace it with 'test' for privacy
+
 ## Tech Stack
 
 -   **Frontend**: React, Tailwind CSS, Framer Motion
