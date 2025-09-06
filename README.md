@@ -4,14 +4,14 @@
 
 SocialKart is an AI-powered tool that automatically converts Instagram posts into professional product listings. It streamlines the e-commerce content creation process by extracting video frames, transcribing audio, and using AI to generate marketing copy.
 
-## Try Here
+# Backend Pipeline in detail
+* Media Scraping: It logs into Instagram (this becomes important later) and downloads the video and caption from a given post URL.
+* Frame Analysis: The video is broken down frame-by-frame. An ONNX/PyTorch model classifies each frame to find the most relevant ones for an e-commerce listing (e.g., clear product shots).
+* Audio Transcription: The audio is extracted from the video and transcribed into text.
+* LLM Generation: The original caption, the transcribed text, and other metadata are fed to Google's Gemini LLM, which generates a structured JSON output for a product name, description, key features, and more.
+* Final Output: The generated text and the best frames are compiled into a preview that looks like an Amazon product page.
 
-**[socialkart.vercel.app](https://socialkart.vercel.app)**
-
-To use the app, go to `socialkart.vercel.app/update` and add your Instagram session ID:
-1. Open Chrome Dev Tools → Application tab → Find `sessionId` 
-2. Copy and paste it in the update section
-3. After testing, replace it with 'test' for privacy
+## Try Here: [socialkart](https://socialkart.vercel.app)
 
 ## Tech Stack
 
