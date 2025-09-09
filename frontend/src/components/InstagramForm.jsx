@@ -192,6 +192,16 @@ function InstagramForm({ onSubmit, disabled }) {
                          shadow-sm"
               />
             </div>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setUrl('https://www.instagram.com/p/DNSNq6bR635/')}
+                className="text-sm text-blue-600 hover:underline disabled:opacity-50"
+                disabled={disabled}
+              >
+                Use example post
+              </button>
+            </div>
           </div>
 
           <motion.button
