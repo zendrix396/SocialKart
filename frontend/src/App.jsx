@@ -183,10 +183,10 @@ function ServiceStatusBanner() {
   let label = 'Checking service status...';
 
   if (status.state === 'success') {
-    container = 'bg-green-50 border-green-200';
-    iconColor = 'text-green-600';
-    textColor = 'text-green-700';
-    label = 'All systems operational';
+    container = 'bg-red-50 border-red-200';
+    iconColor = 'text-red-600';
+    textColor = 'text-red-700';
+    label = 'service down, burner account got banned. Try locally following the instructions from Github.';
   } else if (status.state === 'error') {
     container = 'bg-red-50 border-red-200';
     iconColor = 'text-red-600';
