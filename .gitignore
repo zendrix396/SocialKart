@@ -2,6 +2,7 @@
 backend/venv/
 audio_worker/venv/
 insp/
+
 # Ignore local files
 backend/config.py
 
