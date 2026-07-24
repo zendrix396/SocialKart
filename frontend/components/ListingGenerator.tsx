@@ -8,7 +8,7 @@ import {
   CheckCircle2, Sparkles, RefreshCw
 } from 'lucide-react';
 
-const SOCKET_URL = 'http://localhost:5000';
+const SOCKET_URL = import.meta.env.VITE_BACKEND_URL || 'https://socialkart.onrender.com';
 
 const ListingGenerator: React.FC = () => {
   const [platform, setPlatform] = useState<SocialPlatform>(SocialPlatform.INSTAGRAM);
