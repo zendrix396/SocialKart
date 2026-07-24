@@ -19,9 +19,13 @@ const ListingGenerator: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [imageIndex, setImageIndex] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [backendUp, setBackendUp] = useState<boolean | null>(null);
   const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
+    fetch(`${SOCKET_URL}/`, { method: 'GET' })
+      .then((r) => setBackendUp(r.ok))
+      .catch(() => setBackendUp(false));
     return () => {
       if (socketRef.current) {
         socketRef.current.disconnect();
@@ -72,7 +76,7 @@ const ListingGenerator: React.FC = () => {
     });
 
     socket.on('connect_error', () => {
-      setError('Could not connect to backend. Make sure it is running on port 5000.');
+      setError('Service is currently unavailable. The backend may be waking up — try again in 30 seconds.');
       setLoading(false);
       setProgress(null);
       socket.disconnect();
@@ -119,6 +123,12 @@ const ListingGenerator: React.FC = () => {
 
   return (
     <div className="w-full max-w-5xl mx-auto">
+      {backendUp === false && (
+        <div className="mb-6 bg-yellow-500/10 border border-yellow-500/30 px-5 py-3 flex items-center gap-3">
+          <AlertCircle className="w-4 h-4 text-yellow-500 flex-shrink-0" />
+          <span className="text-sm text-yellow-400 font-medium">Service Disrupted: Local Mode Active</span>
+        </div>
+      )}
       {/* Input Card */}
       <div className="bg-black border border-zinc-800 shadow-2xl relative backdrop-blur-sm">
         <div className="flex border-b border-zinc-800 overflow-x-auto no-scrollbar">

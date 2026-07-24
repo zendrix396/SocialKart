@@ -36,7 +36,7 @@ const Navbar: React.FC = () => {
             <div className="ml-10 flex items-baseline space-x-1">
               <button onClick={() => scrollToSection('features')} className="text-zinc-400 hover:text-green-500 hover:bg-green-500/10 px-4 py-2 rounded-none text-sm font-medium transition-all">Features</button>
               <button onClick={() => scrollToSection('about')} className="text-zinc-400 hover:text-green-500 hover:bg-green-500/10 px-4 py-2 rounded-none text-sm font-medium transition-all">About</button>
-              <a href="https://github.com" target="_blank" rel="noreferrer" className="text-zinc-400 hover:text-green-400 hover:bg-green-500/10 px-4 py-2 rounded-none text-sm font-medium transition-all flex items-center gap-2">
+              <a href="https://github.com/zendrix396/SocialKart" target="_blank" rel="noreferrer" className="text-zinc-400 hover:text-green-400 hover:bg-green-500/10 px-4 py-2 rounded-none text-sm font-medium transition-all flex items-center gap-2">
                 <Github className="w-4 h-4" />
                 <span>GitHub</span>
               </a>

@@ -147,7 +147,7 @@ const Features: React.FC = () => {
                             <p>[SUCCESS] <span className="text-green-500">Local environment active. Ready for input.</span></p>
                         </div>
                         <p className="pt-4 text-zinc-300">
-                             For full deployment capabilities, please refer to the <a href="https://github.com" className="text-green-500 hover:underline">GitHub repository</a>. 
+                                For full deployment capabilities, please refer to the <a href="https://github.com/zendrix396/SocialKart" className="text-green-500 hover:underline">GitHub repository</a>.
                              The current live demo utilizes a simulated response engine to demonstrate UI flows and data structuring capabilities without active backend scraping.
                         </p>
                     </div>
