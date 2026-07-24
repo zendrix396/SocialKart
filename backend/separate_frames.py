@@ -9,21 +9,28 @@ import imageio_ffmpeg as iio_ffmpeg
 def _get_video_duration_seconds(video_path: str) -> Optional[float]:
     """Return duration in seconds by parsing ffmpeg probe output. None if unknown."""
     ffmpeg_exe = iio_ffmpeg.get_ffmpeg_exe()
-    # "ffmpeg -i <input>" prints metadata (including Duration) to stderr
-    proc = subprocess.run(
-        [ffmpeg_exe, "-hide_banner", "-i", video_path],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
-    meta = proc.stderr or ""
-    match = re.search(r"Duration:\s+(\d+):(\d+):(\d+(?:\.\d+)?)", meta)
-    if not match:
+    try:
+        proc = subprocess.run(
+            [ffmpeg_exe, "-hide_banner", "-i", video_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=15,
+        )
+        meta = proc.stderr or ""
+        match = re.search(r"Duration:\s+(\d+):(\d+):(\d+(?:\.\d+)?)", meta)
+        if not match:
+            return None
+        hours = int(match.group(1))
+        minutes = int(match.group(2))
+        seconds = float(match.group(3))
+        return hours * 3600 + minutes * 60 + seconds
+    except subprocess.TimeoutExpired:
+        print("ffmpeg probe timed out")
         return None
-    hours = int(match.group(1))
-    minutes = int(match.group(2))
-    seconds = float(match.group(3))
-    return hours * 3600 + minutes * 60 + seconds
+    except Exception as e:
+        print(f"ffmpeg probe error: {e}")
+        return None
 
 
 def video_to_frames(video_path, frames_dir, shortcode):
@@ -64,4 +71,15 @@ def video_to_frames(video_path, frames_dir, shortcode):
         output_pattern,
     ]
 
-    subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    print(f"Running ffmpeg: fps={fps:.4f}, output={output_folder}")
+    try:
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120)
+        if result.returncode != 0:
+            print(f"ffmpeg stderr: {result.stderr.decode('utf-8', errors='replace')[:500]}")
+        else:
+            frame_count = len([f for f in os.listdir(output_folder) if f.endswith('.png')])
+            print(f"Extracted {frame_count} frames")
+    except subprocess.TimeoutExpired:
+        print("ffmpeg frame extraction timed out after 120s")
+    except Exception as e:
+        print(f"ffmpeg error: {e}")

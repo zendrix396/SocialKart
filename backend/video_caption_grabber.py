@@ -139,7 +139,13 @@ def grab_post(url, request_dir):
             with open(filepath, "wb") as f:
                 for chunk in r.iter_content(chunk_size=8192):
                     f.write(chunk)
-            print(f"Downloaded: {filename}")
+            file_size = os.path.getsize(filepath)
+            print(f"Downloaded: {filename} ({file_size / 1024:.1f} KB)")
+
+            if file_size < 1024:
+                print(f"Warning: {filename} seems too small ({file_size} bytes), might be corrupt")
+                os.remove(filepath)
+                continue
 
             if ext == ".mp4" and video_path is None:
                 # Rename to standard name
