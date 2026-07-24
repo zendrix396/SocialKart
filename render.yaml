@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: socialkart-backend
+    runtime: python
+    plan: free
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: cd backend && python app.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.10"
